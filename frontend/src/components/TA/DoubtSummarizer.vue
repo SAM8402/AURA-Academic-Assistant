@@ -1,6 +1,6 @@
 <script setup>
 import { ref, onMounted, watch, computed } from 'vue'
-import TASidebar from '@/components/layout/TaLayout/TASideBar.vue'
+import TASidebar from '@/components/layout/TaLayout/TASidebar.vue'
 import doubtsAPI from '@/api/doubts'
 import ExportOptions from '@/components/shared/ExportOptions.vue'
 import { 
@@ -108,7 +108,16 @@ const fetchSummary = async (isRefresh = false) => {
     isInitialLoad.value = false
   } catch (e) {
     console.error('Failed to load doubt summary', e)
-    error.value = e.response?.data?.detail || e.message || 'Failed to load summary. Please try again.'
+    isInitialLoad.value = false
+    if (e.code === 'ECONNABORTED' || e.message?.includes('timeout')) {
+      error.value = 'Request timed out. The server may be busy. Please try again.'
+    } else if (e.response?.status === 401) {
+      error.value = 'Session expired. Please log in again.'
+    } else if (e.response?.status === 403) {
+      error.value = 'You do not have permission to view this data.'
+    } else {
+      error.value = e.response?.data?.detail || e.message || 'Failed to load summary. Please try again.'
+    }
   } finally {
     isLoading.value = false
   }

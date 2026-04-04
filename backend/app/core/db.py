@@ -66,21 +66,13 @@ def get_db():
 
     Yields:
         Session: SQLAlchemy database session
-
-    Example:
-        @app.get("/items")
-        def get_items(db: Session = Depends(get_db)):
-            items = db.query(Item).all()
-            return items
-
-    Usage with automatic cleanup:
-        - Session is automatically closed after request
-        - Transactions are rolled back on exceptions
-        - Ensures no database connection leaks
     """
     db = SessionLocal()
     try:
         yield db
+    except Exception:
+        db.rollback()
+        raise
     finally:
         db.close()
 
@@ -109,7 +101,10 @@ def init_db():
     from app.models import (
         User, Query, QueryResponse, Resource, Announcement, Profile,
         # New models from merge
-        KnowledgeSource, KnowledgeChunk, Call, ChatSession, Task
+        KnowledgeSource, KnowledgeChunk, Call, ChatSession, Task,
+        # Additional models
+        Course, UserCourse, Quiz, QuizAttempt, SlideDeck, Tag,
+        DoubtUpload, DoubtMessage
     )
 
     # Create all tables

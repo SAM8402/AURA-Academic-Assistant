@@ -228,7 +228,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import TASidebar from '@/components/layout/TaLayout/TASideBar.vue'
+import TASidebar from '@/components/layout/TaLayout/TASidebar.vue'
 import InstructorSidebar from '@/components/layout/InstructorLayout/InstructorSideBar.vue'
 import { useUserStore } from '@/stores/user'
 import { useSlideDeckStore } from '@/stores/slideDeck'

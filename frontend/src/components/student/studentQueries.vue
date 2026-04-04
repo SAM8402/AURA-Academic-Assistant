@@ -356,7 +356,7 @@ onMounted(() => {
                 <div class="flex items-center gap-2 text-xs mb-3" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
                   <component :is="getCategoryIcon(selectedQuery.category)" class="w-5 h-5 text-blue-400" />
                   <span class="font-semibold">{{ selectedQuery.category }}</span>
-                  <span class="mx-2 rounded-lg px-2 py-0.5 bg-slate-100" :style="{ color: 'black' }">
+                  <span class="mx-2 rounded-lg px-2 py-0.5 bg-slate-100" :style="{ color: 'var(--color-text-primary)' }">
                     {{ selectedQuery.priority }}
                   </span>
                   <span
@@ -478,7 +478,7 @@ onMounted(() => {
                       v-for="tag in selectedQuery.tags"
                       :key="tag"
                       class="px-2 py-1 bg-gray-100 rounded text-xs"
-                      :style="{ color: themeStore.currentTheme === 'dark' ? 'black' : 'black' }"
+                      :style="{ color: 'var(--color-text-primary)' }"
                     >
                       #{{ tag }}
                     </span>

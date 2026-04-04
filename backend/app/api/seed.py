@@ -6,10 +6,12 @@ Access at: POST /api/seed/populate
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 import random
 
 from app.core.db import get_db
+from app.api.dependencies import get_current_user
+from app.core.security import is_admin
 from app.models.user import User
 from app.models.knowledge import KnowledgeSource, KnowledgeChunk
 from app.models.task import Task
@@ -28,7 +30,7 @@ router = APIRouter(prefix="/seed", tags=["Seed Data"])
 
 
 @router.post("/populate")
-async def populate_database(db: Session = Depends(get_db)):
+async def populate_database(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     """
     Populate database with mock data.
 
@@ -153,7 +155,7 @@ async def populate_database(db: Session = Depends(get_db)):
                     category=data["category"],
                     is_active=True,
                     chunk_count=1,  # Set chunk_count since we're creating 1 chunk
-                    created_at=datetime.utcnow()
+                    created_at=datetime.now(UTC)
                 )
                 db.add(source)
                 db.flush()
@@ -182,7 +184,7 @@ async def populate_database(db: Session = Depends(get_db)):
                 task_type=data["task_type"],
                 status=data["status"],
                 error_message=data.get("error"),
-                created_at=datetime.utcnow() - timedelta(days=random.randint(0, 7))
+                created_at=datetime.now(UTC) - timedelta(days=random.randint(0, 7))
             )
             db.add(task)
             result["tasks_created"] += 1
@@ -337,7 +339,7 @@ async def populate_database(db: Session = Depends(get_db)):
                         status=data["status"],
                         tags=data.get("tags", []),
                         student_id=student.id,
-                        created_at=datetime.utcnow() - timedelta(days=data.get("days_ago", 0))
+                        created_at=datetime.now(UTC) - timedelta(days=data.get("days_ago", 0))
                     )
                     db.add(query)
                     db.flush()  # Get query.id
@@ -358,7 +360,7 @@ async def populate_database(db: Session = Depends(get_db)):
                                 user_id=responder.id,
                                 content=resp_data["content"],
                                 is_solution=resp_data.get("is_solution", False),
-                                created_at=datetime.utcnow() - timedelta(minutes=resp_data.get("minutes_ago", 0))
+                                created_at=datetime.now(UTC) - timedelta(minutes=resp_data.get("minutes_ago", 0))
                             )
                             db.add(response)
 
@@ -382,7 +384,7 @@ async def populate_database(db: Session = Depends(get_db)):
 
 
 @router.delete("/clear")
-async def clear_seed_data(db: Session = Depends(get_db)):
+async def clear_seed_data(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     """
     Clear all seed data from database.
 

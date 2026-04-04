@@ -1,28 +1,28 @@
 <template>
-  <div class="flex h-screen" :style="{ color: themeStore?.currentTheme === 'dark' ? 'white' : 'black' }">
+  <div class="flex h-screen" :style="{ color: 'var(--text-primary)' }">
     <!-- Sidebar -->
     <Sidebar />
 
     <!-- Main Section -->
-    <div class="flex flex-col flex-grow main-theme ml-[250px]" :style="{ color: themeStore?.currentTheme === 'dark' ? 'white' : 'black' }">
+    <div class="flex flex-col flex-grow main-theme ml-[250px]" :style="{ color: 'var(--text-primary)' }">
       <HeaderBar v-if="!isOnBreak" />
 
       <!-- Main Body -->
-      <div class="flex flex-grow overflow-hidden main-theme" :style="{ color: themeStore?.currentTheme === 'dark' ? 'white' : 'black' }">
+      <div class="flex flex-grow overflow-hidden main-theme" :style="{ color: 'var(--text-primary)' }">
         <!-- Course Section -->
-        <div class="p-6 flex-grow overflow-y-auto section-theme" :style="{ color: themeStore?.currentTheme === 'dark' ? 'white' : 'black' }">
+        <div class="p-6 flex-grow overflow-y-auto section-theme" :style="{ color: 'var(--text-primary)' }">
           <div class="flex flex-wrap justify-between items-center mb-6 gap-3">
-              <div class="flex flex-wrap items-center gap-2 section-text" :style="{ color: themeStore?.currentTheme === 'dark' ? 'white' : 'black' }">
+              <div class="flex flex-wrap items-center gap-2 section-text" :style="{ color: 'var(--text-primary)' }">
               <i class="bi bi-journal-bookmark text-blue-600 text-lg"></i>
-              <span class="font-semibold" :style="{ color: themeStore?.currentTheme === 'dark' ? 'white' : 'black' }">{{ courses.length }} Active Courses</span>
-              <span class="section-subtext" :style="{ color: themeStore?.currentTheme === 'dark' ? 'white' : 'black' }">| {{ deadlineCount }} Deadlines This Week</span>
+              <span class="font-semibold" :style="{ color: 'var(--text-primary)' }">{{ courses.length }} Active Courses</span>
+              <span class="section-subtext" :style="{ color: 'var(--text-primary)' }">| {{ deadlineCount }} Deadlines This Week</span>
             </div>            <!-- Buttons -->
             <div class="flex flex-wrap gap-3 justify-end">
               <!-- Add Resource -->
                 <button
               @click="showAddResource = true"
               class="px-3 py-1.5 border rounded-full text-sm font-medium transition add-resource-btn"
-              :style="{ color: themeStore?.currentTheme === 'dark' ? 'white' : 'black' }"
+              :style="{ color: 'var(--text-primary)' }"
                 >
               <i class="bi bi-collection me-1"></i> Add Resources
                 </button>
@@ -31,7 +31,7 @@
                 <button
                 @click="showStudyBreak = true"
                 class="px-3 py-1.5 border rounded-full text-sm font-medium transition study-break-btn"
-                :style="{ color: themeStore?.currentTheme === 'dark' ? 'white' : 'black' }"
+                :style="{ color: 'var(--text-primary)' }"
                 >
                 <i class="bi bi-cup-hot me-1"></i>
                 {{ isOnBreak ? `Break: ${formattedTime}` : 'Study Break' }}

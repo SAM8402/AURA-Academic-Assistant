@@ -1,5 +1,5 @@
 <template>
-  <div class="flex h-screen overflow-hidden" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
+  <div class="flex h-screen overflow-hidden" :style="{ color: 'var(--text-primary)' }">
     <!-- Sidebar -->
     <Sidebar class="sticky top-0 h-screen flex-shrink-0" />
 
@@ -20,8 +20,8 @@
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
                 </svg>
               </div>
-              <h3 class="text-xl font-semibold mb-2" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Start a New Query</h3>
-              <p class="max-w-md" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
+              <h3 class="text-xl font-semibold mb-2" :style="{ color: 'var(--text-primary)' }">Start a New Query</h3>
+              <p class="max-w-md" :style="{ color: 'var(--text-primary)' }">
                 Ask a question about your coursework, assignments, or concepts. Our AI assistant and instructors are here to help!
               </p>
             </div>
@@ -66,7 +66,7 @@
                 class="p-1.5 rounded-lg hover:bg-gray-100 transition"
                 title="New Chat"
               >
-                <svg class="w-5 h-5" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg class="w-5 h-5" :style="{ color: 'var(--text-primary)' }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
                 </svg>
               </button>

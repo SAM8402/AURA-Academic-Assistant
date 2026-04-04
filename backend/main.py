@@ -10,12 +10,15 @@ This module initializes the FastAPI application with:
 - Comprehensive API documentation
 """
 
-from fastapi import FastAPI
+import logging
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import RedirectResponse
+from fastapi.responses import RedirectResponse, JSONResponse
 from contextlib import asynccontextmanager
 from dotenv import load_dotenv
 from app.api.doubt_summarizer_router import router as doubt_router
+
+logger = logging.getLogger(__name__)
 
 # Try to import LangChain (optional dependency)
 try:
@@ -59,15 +62,15 @@ async def lifespan(app: FastAPI):
     - Shutdown: Cleanup resources (if needed)
     """
     # Startup: Initialize database
-    print("Starting AURA API...")
-    print(f"Database: {settings.DATABASE_URL}")
+    logger.info("Starting AURA API...")
+    logger.info("Database: %s", settings.DATABASE_URL)
     init_db()
-    print("Database initialized")
+    logger.info("Database initialized")
 
     yield
 
     # Shutdown: Cleanup (if needed)
-    print("Shutting down AURA API...")
+    logger.info("Shutting down AURA API...")
 
 
 # ============================================================================
@@ -228,17 +231,16 @@ app.include_router(
     prefix=settings.API_PREFIX
 )
 
-# Seed Data routes (for development/testing)
-app.include_router(
-    seed_router,
-    prefix=settings.API_PREFIX
-)
-
-# Enhanced Seed Data routes (for comprehensive testing)
-app.include_router(
-    seed_enhanced_router,
-    prefix=settings.API_PREFIX
-)
+# Seed Data routes (development/testing only - disabled in production)
+if settings.DEBUG:
+    app.include_router(
+        seed_router,
+        prefix=settings.API_PREFIX
+    )
+    app.include_router(
+        seed_enhanced_router,
+        prefix=settings.API_PREFIX
+    )
 
 # Queries routes
 app.include_router(
@@ -287,9 +289,10 @@ app.include_router(
 )
 # Video Summary routes
 app.include_router(
-    video_router.router, 
-    prefix="/api/video", 
-    tags=["Video"])
+    video_router.router,
+    prefix=f"{settings.API_PREFIX}/video",
+    tags=["Video"]
+)
 
 # Student Resource routes
 app.include_router(
@@ -323,6 +326,16 @@ async def root():
     return RedirectResponse(url="/docs")
 
 
+@app.exception_handler(Exception)
+async def global_exception_handler(request: Request, exc: Exception):
+    """Global exception handler for unhandled errors."""
+    logger.error("Unhandled error on %s %s: %s", request.method, request.url.path, exc, exc_info=True)
+    return JSONResponse(
+        status_code=500,
+        content={"detail": "Internal server error"},
+    )
+
+
 @app.get(
     "/health",
     tags=["Health"],
@@ -339,8 +352,6 @@ async def health_check():
         "status": "healthy",
         "app_name": settings.APP_NAME,
         "version": settings.APP_VERSION,
-        "environment": "development" if settings.DEBUG else "production",
-        "database": "connected"
     }
 
 
@@ -379,26 +390,22 @@ async def api_info():
 if __name__ == "__main__":
     import uvicorn
 
-    env_display = "Development" if settings.DEBUG else "Production"
-    print(f"""
-    ================================================================
+    logging.basicConfig(
+        level=logging.DEBUG if settings.DEBUG else logging.INFO,
+        format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    )
 
-       AURA - Academic Unified Response Assistant
-
-       Version: {settings.APP_VERSION:<50}
-       Environment: {env_display:<44}
-
-       API Documentation: http://localhost:8000/docs
-       ReDoc: http://localhost:8000/redoc
-       Health Check: http://localhost:8000/health
-
-    ================================================================
-    """)
+    logger.info(
+        "Starting AURA v%s (%s)",
+        settings.APP_VERSION,
+        "development" if settings.DEBUG else "production",
+    )
+    logger.info("API docs: http://localhost:8000/docs")
 
     uvicorn.run(
         "main:app",
         host="0.0.0.0",
         port=8000,
         reload=settings.DEBUG,
-        log_level="info" if settings.DEBUG else "warning"
+        log_level="debug" if settings.DEBUG else "info"
     )

@@ -29,7 +29,6 @@ from app.services.chart_generator import chart_generator
 from app.services.content_optimizer import content_optimizer
 from app.services.graph_validator import graph_validator
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
@@ -91,7 +90,6 @@ class SlideDeckService:
                 model=settings.GEMINI_MODEL,
                 google_api_key=settings.GOOGLE_API_KEY,
                 temperature=0.7,
-                convert_system_message_to_human=True
             )
             logger.info(f"[OK] SlideDeckService initialized with Gemini model: {settings.GEMINI_MODEL}")
         except Exception as e:
@@ -146,8 +144,8 @@ class SlideDeckService:
             logger.info("Successfully generated slide deck preview.")
             return preview_data
         except Exception as e:
-            logger.error(f"Failed to generate preview: {e}")
-            return {"error": f"An error occurred while generating the preview: {str(e)}"}
+            logger.error("Failed to generate preview", exc_info=True)
+            return {"error": "An error occurred while generating the preview. Please try again later."}
 
     async def generate_slides(
         self,
@@ -303,8 +301,8 @@ class SlideDeckService:
             logger.info("Successfully generated slide deck content.")
             return deck_data
         except Exception as e:
-            logger.error(f"Failed to generate or parse slide deck: {e}")
-            return {"error": f"An error occurred while generating the slides: {str(e)}"}
+            logger.error("Failed to generate or parse slide deck", exc_info=True)
+            return {"error": "An error occurred while generating the slides. Please try again later."}
     
     def _add_charts_to_slides(
         self, 

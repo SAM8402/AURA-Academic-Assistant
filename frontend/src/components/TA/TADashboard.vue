@@ -1,5 +1,5 @@
 <script setup>
-import TASidebar from '@/components/layout/TaLayout/TASideBar.vue'
+import TASidebar from '@/components/layout/TaLayout/TASidebar.vue'
 import TaHeaderBar from '@/components/layout/TaLayout/TaHeaderBar.vue'
 import { CheckCircleIcon, UsersIcon, ClockIcon, ArrowTrendingUpIcon, PlusCircleIcon, ArrowRightOnRectangleIcon, ClipboardDocumentListIcon, ChatBubbleLeftRightIcon } from "@heroicons/vue/24/outline"
 

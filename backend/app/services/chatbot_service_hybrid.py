@@ -325,8 +325,7 @@ class HybridChatbotService:
                 model=settings.GEMINI_MODEL,
                 google_api_key=settings.GOOGLE_API_KEY,
                 temperature=settings.GEMINI_TEMPERATURE,
-                max_output_tokens=settings.GEMINI_MAX_TOKENS,
-                convert_system_message_to_human=True
+                max_output_tokens=settings.GEMINI_MAX_TOKENS
             )
             print(f"[OK] LangChain Gemini LLM initialized - Model: {settings.GEMINI_MODEL}")
         except Exception as e:
@@ -390,7 +389,7 @@ class HybridChatbotService:
                     api_key=settings.GOOGLE_API_KEY,
                     retry_options=retry_config
                 ),
-                name="AURA_Chatbot",
+                name="AURA",
                 description="AURA (Academic Unified Response Assistant) - AI teaching assistant with cross-session memory",
                 instruction="""You are AURA, an intelligent academic assistant.
 

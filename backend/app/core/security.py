@@ -4,7 +4,7 @@ Security utilities for authentication and authorization.
 This module provides JWT token generation, validation, and password hashing utilities.
 """
 
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, UTC
 from typing import Optional, Dict, Any
 from jose import JWTError, jwt
 from passlib.context import CryptContext
@@ -97,14 +97,14 @@ def create_access_token(
     if expires_delta is None:
         expires_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
-    expire = datetime.utcnow() + expires_delta
+    expire = datetime.now(UTC) + expires_delta
 
     to_encode: Dict[str, Any] = {
         "sub": str(user_id),  # Subject (user ID)
         "email": email,
         "role": role.value if isinstance(role, UserRole) else role,
         "exp": expire,  # Expiration time
-        "iat": datetime.utcnow(),  # Issued at
+        "iat": datetime.now(UTC),  # Issued at
         "type": "access"  # Token type
     }
 
@@ -145,13 +145,13 @@ def create_refresh_token(
     if expires_delta is None:
         expires_delta = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
-    expire = datetime.utcnow() + expires_delta
+    expire = datetime.now(UTC) + expires_delta
 
     to_encode: Dict[str, Any] = {
         "sub": str(user_id),
         "email": email,
         "exp": expire,
-        "iat": datetime.utcnow(),
+        "iat": datetime.now(UTC),
         "type": "refresh"  # Token type
     }
 
@@ -195,13 +195,15 @@ def decode_token(token: str, token_type: str = "access") -> TokenData:
         if payload.get("type") != token_type:
             raise JWTError(f"Invalid token type. Expected {token_type}")
 
-        user_id: int = int(payload.get("sub"))
+        sub = payload.get("sub")
         email: str = payload.get("email")
         role_str: str = payload.get("role")
-        exp_timestamp: int = payload.get("exp")
+        exp_timestamp = payload.get("exp")
 
-        if user_id is None or email is None:
+        if sub is None or email is None:
             raise JWTError("Invalid token payload")
+
+        user_id: int = int(sub)
 
         # Convert role string to UserRole enum (only for access tokens)
         if token_type == "access" and role_str:
@@ -213,12 +215,12 @@ def decode_token(token: str, token_type: str = "access") -> TokenData:
             role = None
 
         # Convert expiration timestamp to datetime
-        exp = datetime.fromtimestamp(exp_timestamp) if exp_timestamp else None
+        exp = datetime.fromtimestamp(exp_timestamp) if exp_timestamp is not None else None
 
         return TokenData(
             user_id=user_id,
             email=email,
-            role=role,
+            role=role if role is not None else UserRole.STUDENT,
             exp=exp
         )
 

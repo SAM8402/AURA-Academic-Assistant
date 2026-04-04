@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, status as http_status, Qu
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func, desc
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, UTC
 
 from app.core.db import get_db
 from app.api.dependencies import get_current_user
@@ -327,7 +327,7 @@ async def add_query_response(
         # If marked as solution, resolve query
         if new_response.is_solution:
             query.status = QueryStatus.RESOLVED
-            query.resolved_at = datetime.utcnow()
+            query.resolved_at = datetime.now(UTC)
 
         db.commit()
         db.refresh(new_response)
@@ -388,7 +388,7 @@ async def update_query_status(
             query.resolution_notes = status_data.resolution_notes
 
         if status_data.status == QueryStatus.RESOLVED:
-            query.resolved_at = datetime.utcnow()
+            query.resolved_at = datetime.now(UTC)
 
         db.commit()
 

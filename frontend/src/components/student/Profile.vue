@@ -103,25 +103,25 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="flex min-h-screen" :style="{ background: 'var(--bg-primary)', color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
+  <div class="flex min-h-screen" :style="{ background: 'var(--bg-primary)', color: 'var(--text-primary)' }">
     <Sidebar class="fixed top-0 left-0 h-screen w-[250px]" />
-    <main class="flex-1 p-8 ml-[250px] overflow-y-auto" :style="{ background: 'var(--bg-primary)', color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
+    <main class="flex-1 p-8 ml-[250px] overflow-y-auto" :style="{ background: 'var(--bg-primary)', color: 'var(--text-primary)' }">
       <HeaderBar searchPlaceholder="Search courses, threads, resources" />
-      <h2 class="font-bold text-2xl mb-6" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Settings</h2>
+      <h2 class="font-bold text-2xl mb-6" :style="{ color: 'var(--text-primary)' }">Settings</h2>
 
       <!-- Loading State -->
       <div v-if="isLoading" class="text-center py-12">
         <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-        <p class="mt-4" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Loading your profile...</p>
+        <p class="mt-4" :style="{ color: 'var(--text-primary)' }">Loading your profile...</p>
       </div>
 
       <!-- Error State -->
-      <div v-else-if="error" class="bg-red-50 border border-red-200 rounded-xl p-6 mb-6" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
+      <div v-else-if="error" class="bg-red-50 border border-red-200 rounded-xl p-6 mb-6" :style="{ color: 'var(--text-primary)' }">
         <div class="flex items-center gap-3">
           <ExclamationCircleIcon class="w-6 h-6 text-red-600" />
           <div>
-            <h3 class="text-red-800 font-semibold mb-1" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Error</h3>
-            <p class="text-red-600 text-sm" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ error }}</p>
+            <h3 class="text-red-800 font-semibold mb-1" :style="{ color: 'var(--text-primary)' }">Error</h3>
+            <p class="text-red-600 text-sm" :style="{ color: 'var(--text-primary)' }">{{ error }}</p>
           </div>
         </div>
         <button
@@ -133,11 +133,11 @@ onMounted(() => {
       </div>
 
       <!-- Profile Content -->
-      <div v-else class="grid grid-cols-12 gap-8" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
+      <div v-else class="grid grid-cols-12 gap-8" :style="{ color: 'var(--text-primary)' }">
         <!-- Left main content -->
         <div class="col-span-8 space-y-8">
           <!-- Profile Card -->
-          <div class="rounded-2xl p-6 shadow cursor-pointer flex flex-col sm:flex-row items-start gap-8 hover:shadow-xl transition group" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
+          <div class="rounded-2xl p-6 shadow cursor-pointer flex flex-col sm:flex-row items-start gap-8 hover:shadow-xl transition group" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', color: 'var(--text-primary)' }">
             <div class="flex flex-col items-center min-w-[120px]">
               <div class="w-20 h-20 rounded-full bg-gradient-to-br from-blue-400 to-blue-600 flex items-center justify-center text-white text-2xl font-bold border-4 border-blue-100 shadow mb-3 transition group-hover:scale-110">
                 {{ profileData.full_name.charAt(0).toUpperCase() }}
@@ -150,21 +150,21 @@ onMounted(() => {
             <form class="flex-1 w-full grid grid-cols-1 gap-3">
               <div class="grid md:grid-cols-2 gap-4">
                 <div>
-                  <label class="block text-xs mb-1" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Full name</label>
+                  <label class="block text-xs mb-1" :style="{ color: 'var(--text-primary)' }">Full name</label>
                   <input
                     type="text"
                     class="w-full border rounded-lg p-2 mb-3 focus:ring focus:border-blue-400 hover:border-blue-400 transition"
                     :value="profileData.full_name"
                     readonly
                   />
-                  <label class="block text-xs mb-1" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">University email</label>
+                  <label class="block text-xs mb-1" :style="{ color: 'var(--text-primary)' }">University email</label>
                   <input
                     type="email"
                     class="w-full border rounded-lg p-2 mb-3 focus:ring focus:border-blue-400 hover:border-blue-400 transition"
                     :value="profileData.email"
                     readonly
                   />
-                  <label class="block text-xs mb-1" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Role</label>
+                  <label class="block text-xs mb-1" :style="{ color: 'var(--text-primary)' }">Role</label>
                   <input
                     type="text"
                     class="w-full border rounded-lg p-2 mb-3 focus:ring focus:border-blue-400 hover:border-blue-400 transition bg-gray-50"
@@ -173,7 +173,7 @@ onMounted(() => {
                   />
                 </div>
                 <div class="flex flex-col items-start gap-3 justify-center">
-                  <label class="hidden sm:block text-xs mb-1" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">&nbsp;</label>
+                  <label class="hidden sm:block text-xs mb-1" :style="{ color: 'var(--text-primary)' }">&nbsp;</label>
                   <button
                     type="button"
                     class="w-full py-2 bg-gray-300 text-gray-600 font-semibold rounded-lg shadow cursor-not-allowed"
@@ -192,8 +192,8 @@ onMounted(() => {
           </div>
 
           <!-- Notifications Card -->
-          <div class="rounded-2xl p-6 shadow space-y-2 hover:shadow-lg transition" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
-            <div class="font-bold mb-2" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Notifications</div>
+          <div class="rounded-2xl p-6 shadow space-y-2 hover:shadow-lg transition" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', color: 'var(--text-primary)' }">
+            <div class="font-bold mb-2" :style="{ color: 'var(--text-primary)' }">Notifications</div>
             <div class="flex flex-col gap-3">
               <label class="flex items-center cursor-pointer hover:bg-blue-50 px-2 py-1 rounded transition">
                 <input type="checkbox" checked class="mr-2 accent-blue-600"> All notifications
@@ -208,8 +208,8 @@ onMounted(() => {
           </div>
 
           <!-- Preferences Card -->
-          <div class="rounded-2xl p-6 shadow hover:shadow-lg transition" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
-            <div class="font-bold mb-2" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Preferences</div>
+          <div class="rounded-2xl p-6 shadow hover:shadow-lg transition" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', color: 'var(--text-primary)' }">
+            <div class="font-bold mb-2" :style="{ color: 'var(--text-primary)' }">Preferences</div>
             <div class="flex gap-6 flex-wrap mb-2">
               <div>
                 <div class="text-xs mb-1 font-semibold">Theme</div>
@@ -224,7 +224,7 @@ onMounted(() => {
                     ]"
                     :style="themeStore.currentTheme === 'light' 
                       ? { backgroundColor: '#2563eb', color: 'white' } 
-                      : { backgroundColor: 'var(--color-bg-card)', color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }"
+                      : { backgroundColor: 'var(--color-bg-card)', color: 'var(--text-primary)' }"
                   >
                     Light
                   </button>
@@ -238,7 +238,7 @@ onMounted(() => {
                     ]"
                     :style="themeStore.currentTheme === 'dark' 
                       ? { backgroundColor: '#2563eb', color: 'white' } 
-                      : { backgroundColor: 'var(--color-bg-card)', color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }"
+                      : { backgroundColor: 'var(--color-bg-card)', color: 'var(--text-primary)' }"
                   >
                     Dark
                   </button>
@@ -259,34 +259,34 @@ onMounted(() => {
           </div>
 
           <!-- Connected services Card -->
-          <div class="rounded-2xl p-6 shadow hover:shadow-lg transition" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
-            <div class="font-bold mb-2" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Connected Services</div>
+          <div class="rounded-2xl p-6 shadow hover:shadow-lg transition" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', color: 'var(--text-primary)' }">
+            <div class="font-bold mb-2" :style="{ color: 'var(--text-primary)' }">Connected Services</div>
             <div class="flex flex-wrap gap-6">
               <div>
                 <span class="font-semibold">GitHub</span>
-                <button class="ml-2" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'gray' }">Not linked</button>
+                <button class="ml-2" :style="{ color: 'var(--text-tertiary)' }">Not linked</button>
               </div>
               <div>
                 <span class="font-semibold">LinkedIn</span>
-                <button class="ml-2" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'gray' }">Not linked</button>
+                <button class="ml-2" :style="{ color: 'var(--text-tertiary)' }">Not linked</button>
               </div>
               <div>
                 <span class="font-semibold">Twitter</span>
-                <button class="ml-2" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'gray' }">Not linked</button>
+                <button class="ml-2" :style="{ color: 'var(--text-tertiary)' }">Not linked</button>
               </div>
               <div>
                 <span class="font-semibold">Cloud Storage</span>
-                <button class="ml-2" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'gray' }">Not linked</button>
+                <button class="ml-2" :style="{ color: 'var(--text-tertiary)' }">Not linked</button>
               </div>
             </div>
           </div>
 
           <!-- Danger Zone Card -->
-          <div class="rounded-2xl p-6 shadow flex items-center justify-between hover:shadow-lg transition" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
+          <div class="rounded-2xl p-6 shadow flex items-center justify-between hover:shadow-lg transition" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', color: 'var(--text-primary)' }">
             <div>
-              <div class="font-bold mb-2" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Danger zone</div>
+              <div class="font-bold mb-2" :style="{ color: 'var(--text-primary)' }">Danger zone</div>
               <div>Delete account</div>
-              <div class="text-xs" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">This action is irreversible</div>
+              <div class="text-xs" :style="{ color: 'var(--text-primary)' }">This action is irreversible</div>
             </div>
             <button class="bg-red-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 hover:bg-red-700 active:scale-95 transition">
               <TrashIcon class="w-5 h-5" />Delete
@@ -295,68 +295,68 @@ onMounted(() => {
         </div>
 
         <!-- Sidebar (Right) for summary, shortcuts, session -->
-        <div class="col-span-4 space-y-6" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
+        <div class="col-span-4 space-y-6" :style="{ color: 'var(--text-primary)' }">
           <!-- Account Summary (Dynamic) -->
-          <div class="rounded-2xl p-6 shadow hover:shadow-lg transition" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
-            <div class="font-bold mb-3" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Account summary</div>
+          <div class="rounded-2xl p-6 shadow hover:shadow-lg transition" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', color: 'var(--text-primary)' }">
+            <div class="font-bold mb-3" :style="{ color: 'var(--text-primary)' }">Account summary</div>
             <div class="space-y-2">
               <div class="flex items-center justify-between">
-                <span class="text-xs" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Email:</span>
-                <span class="text-xs font-mono" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ profileData.email }}</span>
+                <span class="text-xs" :style="{ color: 'var(--text-primary)' }">Email:</span>
+                <span class="text-xs font-mono" :style="{ color: 'var(--text-primary)' }">{{ profileData.email }}</span>
               </div>
               <div class="flex items-center justify-between">
-                <span class="text-xs" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Role:</span>
-                <span class="text-xs font-semibold" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ formattedRole }}</span>
+                <span class="text-xs" :style="{ color: 'var(--text-primary)' }">Role:</span>
+                <span class="text-xs font-semibold" :style="{ color: 'var(--text-primary)' }">{{ formattedRole }}</span>
               </div>
               <div class="flex items-center justify-between">
-                <span class="text-xs" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Member since:</span>
-                <span class="text-xs" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ memberSince }}</span>
+                <span class="text-xs" :style="{ color: 'var(--text-primary)' }">Member since:</span>
+                <span class="text-xs" :style="{ color: 'var(--text-primary)' }">{{ memberSince }}</span>
               </div>
             </div>
 
             <div class="mt-4 pt-4 border-t space-y-2">
-              <div class="font-semibold text-sm mb-2" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Statistics</div>
+              <div class="font-semibold text-sm mb-2" :style="{ color: 'var(--text-primary)' }">Statistics</div>
               <div class="flex items-center justify-between">
-                <span class="text-xs" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Total Queries:</span>
-                <span class="text-sm font-bold" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ userStats.total_queries }}</span>
+                <span class="text-xs" :style="{ color: 'var(--text-primary)' }">Total Queries:</span>
+                <span class="text-sm font-bold" :style="{ color: 'var(--text-primary)' }">{{ userStats.total_queries }}</span>
               </div>
               <div class="flex items-center justify-between">
-                <span class="text-xs" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Open Queries:</span>
-                <span class="text-sm font-bold" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ userStats.open_queries }}</span>
+                <span class="text-xs" :style="{ color: 'var(--text-primary)' }">Open Queries:</span>
+                <span class="text-sm font-bold" :style="{ color: 'var(--text-primary)' }">{{ userStats.open_queries }}</span>
               </div>
               <div class="flex items-center justify-between">
-                <span class="text-xs" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Resolved:</span>
-                <span class="text-sm font-bold" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ userStats.resolved_queries }}</span>
+                <span class="text-xs" :style="{ color: 'var(--text-primary)' }">Resolved:</span>
+                <span class="text-sm font-bold" :style="{ color: 'var(--text-primary)' }">{{ userStats.resolved_queries }}</span>
               </div>
               <div class="flex items-center justify-between">
-                <span class="text-xs" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Active Tasks:</span>
-                <span class="text-sm font-bold" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ userStats.active_tasks }}</span>
+                <span class="text-xs" :style="{ color: 'var(--text-primary)' }">Active Tasks:</span>
+                <span class="text-sm font-bold" :style="{ color: 'var(--text-primary)' }">{{ userStats.active_tasks }}</span>
               </div>
             </div>
           </div>
 
           <!-- Shortcuts -->
-          <div class="rounded-2xl p-6 shadow hover:shadow-lg transition" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
-            <div class="font-bold mb-2" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Shortcuts</div>
+          <div class="rounded-2xl p-6 shadow hover:shadow-lg transition" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', color: 'var(--text-primary)' }">
+            <div class="font-bold mb-2" :style="{ color: 'var(--text-primary)' }">Shortcuts</div>
             <div class="space-y-2">
-              <button class="flex items-center gap-2 w-full text-left text-sm hover:text-blue-700 hover:bg-blue-50 rounded-lg px-2 py-2 transition" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
+              <button class="flex items-center gap-2 w-full text-left text-sm hover:text-blue-700 hover:bg-blue-50 rounded-lg px-2 py-2 transition" :style="{ color: 'var(--text-primary)' }">
                 <Cog6ToothIcon class="w-4 h-4" />Customize AI Assistant
               </button>
-              <button class="flex items-center gap-2 w-full text-left text-sm hover:text-blue-700 hover:bg-blue-50 rounded-lg px-2 py-2 transition" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
+              <button class="flex items-center gap-2 w-full text-left text-sm hover:text-blue-700 hover:bg-blue-50 rounded-lg px-2 py-2 transition" :style="{ color: 'var(--text-primary)' }">
                 <CheckCircleIcon class="w-4 h-4" />Notification settings
               </button>
-              <button class="flex items-center gap-2 w-full text-left text-sm hover:text-blue-700 hover:bg-blue-50 rounded-lg px-2 py-2 transition" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
+              <button class="flex items-center gap-2 w-full text-left text-sm hover:text-blue-700 hover:bg-blue-50 rounded-lg px-2 py-2 transition" :style="{ color: 'var(--text-primary)' }">
                 <EnvelopeIcon class="w-4 h-4" />Help & Support
               </button>
             </div>
           </div>
 
           <!-- Session -->
-          <div class="rounded-2xl p-6 shadow hover:shadow-lg transition" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
-            <div class="font-bold mb-2" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Session</div>
-            <div class="text-xs mb-3" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
+          <div class="rounded-2xl p-6 shadow hover:shadow-lg transition" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', color: 'var(--text-primary)' }">
+            <div class="font-bold mb-2" :style="{ color: 'var(--text-primary)' }">Session</div>
+            <div class="text-xs mb-3" :style="{ color: 'var(--text-primary)' }">
               <div class="mb-1">Currently logged in as:</div>
-              <div class="font-mono" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ profileData.email }}</div>
+              <div class="font-mono" :style="{ color: 'var(--text-primary)' }">{{ profileData.email }}</div>
             </div>
             <button
               @click="handleLogout"

@@ -6,10 +6,12 @@ Access at: POST /api/seed/populate-enhanced
 
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 import random
 
 from app.core.db import get_db
+from app.api.dependencies import get_current_user
+from app.core.security import is_admin
 from app.models.user import User
 from app.models.knowledge import KnowledgeSource, KnowledgeChunk
 from app.models.task import Task
@@ -25,7 +27,7 @@ router = APIRouter(prefix="/seed", tags=["Seed Data"])
 
 
 @router.post("/populate-enhanced")
-async def populate_enhanced_database(db: Session = Depends(get_db)):
+async def populate_enhanced_database(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     """
     Populate database with comprehensive mock data for analytics testing.
 
@@ -85,7 +87,7 @@ async def populate_enhanced_database(db: Session = Depends(get_db)):
                 role=user_data["role"],
                 password=hash_password(user_data["password"]),
                 is_active=True,
-                created_at=datetime.utcnow() - timedelta(days=days_ago)
+                created_at=datetime.now(UTC) - timedelta(days=days_ago)
             )
             db.add(user)
             db.flush()
@@ -153,12 +155,12 @@ async def populate_enhanced_database(db: Session = Depends(get_db)):
         query = Query(
             title=title,
             description=description,
-            category=category.value,
-            priority=priority.value,
+            category=category,
+            priority=priority,
             status=status,
             student_id=student.id,
             tags=f"{category.value.lower()},help",
-            created_at=datetime.utcnow() - timedelta(days=days_ago, hours=hours_offset)
+            created_at=datetime.now(UTC) - timedelta(days=days_ago, hours=hours_offset)
         )
         db.add(query)
         db.flush()
@@ -204,12 +206,12 @@ async def populate_enhanced_database(db: Session = Depends(get_db)):
             query = Query(
                 title=title,
                 description=description,
-                category=category.value,
-                priority=priority.value,
+                category=category,
+                priority=priority,
                 status=QueryStatus.RESOLVED,  # FAQs are usually resolved
                 student_id=student.id,
                 tags=f"{category.value.lower()},faq",
-                created_at=datetime.utcnow() - timedelta(days=days_ago)
+                created_at=datetime.now(UTC) - timedelta(days=days_ago)
             )
             db.add(query)
             db.flush()
@@ -257,7 +259,7 @@ async def populate_enhanced_database(db: Session = Depends(get_db)):
                 content=content,
                 category=category,
                 is_active=True,
-                created_at=datetime.utcnow() - timedelta(days=random.randint(10, 90))
+                created_at=datetime.now(UTC) - timedelta(days=random.randint(10, 90))
             )
             db.add(source)
             db.flush()
@@ -279,7 +281,7 @@ async def populate_enhanced_database(db: Session = Depends(get_db)):
             session = ChatSession(
                 user_id=student.id,
                 title=f"Chat session about {random.choice(['assignments', 'exams', 'concepts', 'debugging'])}",
-                created_at=datetime.utcnow() - timedelta(days=days_ago)
+                created_at=datetime.now(UTC) - timedelta(days=days_ago)
             )
             db.add(session)
             result["chat_sessions_created"] += 1
@@ -309,13 +311,10 @@ async def populate_enhanced_database(db: Session = Depends(get_db)):
         error = task_data[5] if len(task_data) > 5 else None
 
         task = Task(
-            name=name,
-            description=desc,
-            task_type=task_type,
-            status=status,
-            progress=progress,
+            task_type=task_type.value if hasattr(task_type, 'value') else task_type,
+            status=status.value if hasattr(status, 'value') else status,
             error_message=error,
-            created_at=datetime.utcnow() - timedelta(days=random.randint(0, 14))
+            created_at=datetime.now(UTC) - timedelta(days=random.randint(0, 14))
         )
         db.add(task)
         result["tasks_created"] += 1
@@ -334,7 +333,7 @@ async def populate_enhanced_database(db: Session = Depends(get_db)):
 
 
 @router.delete("/clear-all")
-async def clear_all_data(db: Session = Depends(get_db)):
+async def clear_all_data(db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     """
     Clear ALL data from database (use with caution!).
 
@@ -356,4 +355,4 @@ async def clear_all_data(db: Session = Depends(get_db)):
         return {"message": "All data cleared successfully"}
     except Exception as e:
         db.rollback()
-        return {"error": str(e)}
+        from fastapi import HTTPException; raise HTTPException(status_code=500, detail="Failed to clear data")

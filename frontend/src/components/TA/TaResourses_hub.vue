@@ -83,7 +83,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
-import TASidebar from '@/components/layout/TaLayout/TASideBar.vue'
+import TASidebar from '@/components/layout/TaLayout/TASidebar.vue'
 import TaHeaderBar from '@/components/layout/TaLayout/TaHeaderBar.vue'
 
 

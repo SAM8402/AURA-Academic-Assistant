@@ -94,19 +94,19 @@ function scrollToBottom() {
 </script>
 
 <template>
-  <div class="flex h-screen overflow-hidden font-sans" :style="{ backgroundColor: 'var(--page-bg)', color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
+  <div class="flex h-screen overflow-hidden font-sans" :style="{ backgroundColor: 'var(--page-bg)', color: 'var(--text-primary)' }">
     <Sidebar class="fixed top-0 left-0 h-screen w-[250px] z-30" />
 
     <div class="flex flex-col flex-1 ml-[250px]">
       <HeaderBar class="sticky top-0 z-20" />
 
-      <main class="flex-1 p-6 lg:p-8 overflow-y-auto flex flex-col lg:flex-row gap-6" :style="{ backgroundColor: 'var(--page-bg)', color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
+      <main class="flex-1 p-6 lg:p-8 overflow-y-auto flex flex-col lg:flex-row gap-6" :style="{ backgroundColor: 'var(--page-bg)', color: 'var(--text-primary)' }">
 
         <div class="flex-1 space-y-6 h-full overflow-y-auto pr-2 custom-scrollbar">
 
-          <div class="shadow-sm rounded-2xl p-6" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
-            <h1 class="text-2xl font-bold mb-1" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Video Learning Assistant</h1>
-            <p class="text-sm mb-5" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Paste a YouTube link to generate notes & recommendations.</p>
+          <div class="shadow-sm rounded-2xl p-6" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', color: 'var(--text-primary)' }">
+            <h1 class="text-2xl font-bold mb-1" :style="{ color: 'var(--text-primary)' }">Video Learning Assistant</h1>
+            <p class="text-sm mb-5" :style="{ color: 'var(--text-primary)' }">Paste a YouTube link to generate notes & recommendations.</p>
 
             <div class="flex gap-3">
               <div class="relative w-full">
@@ -128,16 +128,16 @@ function scrollToBottom() {
               <button @click="getSummary"
                 class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-6 py-2 rounded-xl transition shadow-sm flex items-center gap-2 disabled:opacity-70"
                 :disabled="isLoading"
-                :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
+                :style="{ color: 'var(--text-primary)' }">
                 <span v-if="isLoading" class="animate-spin">⟳</span> {{ isLoading ? "Analyzing..." : "Summarize" }}
               </button>
             </div>
           </div>
 
-          <div v-if="summary || isLoading" class="shadow-sm rounded-2xl p-8 min-h-[200px]" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
+          <div v-if="summary || isLoading" class="shadow-sm rounded-2xl p-8 min-h-[200px]" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', color: 'var(--text-primary)' }">
             <div class="flex items-center justify-between mb-4 border-b pb-2" :style="{ borderColor: 'var(--color-border)'}">
-              <h2 class="text-lg font-bold" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">✨ Key Insights</h2>
-              <span v-if="!isLoading" class="text-xs font-medium bg-green-100 px-2 py-1 rounded" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Success</span>
+              <h2 class="text-lg font-bold" :style="{ color: 'var(--text-primary)' }">✨ Key Insights</h2>
+              <span v-if="!isLoading" class="text-xs font-medium bg-green-100 px-2 py-1 rounded" :style="{ color: 'var(--text-primary)' }">Success</span>
             </div>
             <div v-if="isLoading" class="animate-pulse space-y-4">
               <div class="h-4 bg-gray-100 rounded w-3/4"></div>
@@ -145,11 +145,11 @@ function scrollToBottom() {
               <div class="h-4 bg-gray-100 rounded w-5/6"></div>
             </div>
             <div v-else class="prose prose-blue prose-sm max-w-none leading-relaxed"
-              :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }"
+              :style="{ color: 'var(--text-primary)' }"
               v-html="md.render(summary)"></div>
           </div>
 
-          <div v-if="relatedVideos.length > 0" class="mt-6 shadow-sm rounded-2xl p-6" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
+          <div v-if="relatedVideos.length > 0" class="mt-6 shadow-sm rounded-2xl p-6" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', color: 'var(--text-primary)' }">
             <div class="flex items-center gap-2 mb-4">
               <div class="p-1.5 bg-red-100 rounded-lg text-red-600">
                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -157,7 +157,7 @@ function scrollToBottom() {
                     d="M2 6a2 2 0 012-2h6a2 2 0 012 2v8a2 2 0 01-2 2H4a2 2 0 01-2-2V6zM14.553 7.106A1 1 0 0014 8v4a1 1 0 00.553.894l2 1A1 1 0 0018 13V7a1 1 0 00-1.447-.894l-2 1z" />
                 </svg>
               </div>
-              <h2 class="text-lg font-bold" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Related Videos & Topics</h2>
+              <h2 class="text-lg font-bold" :style="{ color: 'var(--text-primary)' }">Related Videos & Topics</h2>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-4">
@@ -181,45 +181,45 @@ function scrollToBottom() {
                 </div>
 
                 <div class="flex flex-col justify-center min-w-0">
-                  <h3 class="text-sm font-bold leading-tight group-hover:text-blue-600 line-clamp-2" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
+                  <h3 class="text-sm font-bold leading-tight group-hover:text-blue-600 line-clamp-2" :style="{ color: 'var(--text-primary)' }">
                     {{ video.title }}
                   </h3>
                   <div class="flex items-center gap-2 mt-2">
-                    <span class="text-xs font-medium px-2 py-0.5 rounded-md group-hover:bg-section" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Watch on YouTube ↗</span>
+                    <span class="text-xs font-medium px-2 py-0.5 rounded-md group-hover:bg-section" :style="{ color: 'var(--text-primary)' }">Watch on YouTube ↗</span>
                   </div>
                 </div>
               </a>
             </div>
           </div>
 
-          <div v-if="relatedVideos.length > 0" class="shadow-sm rounded-2xl p-6" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
-            <h2 class="text-lg font-bold mb-4" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Recommended Next Steps</h2>
+          <div v-if="relatedVideos.length > 0" class="shadow-sm rounded-2xl p-6" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', color: 'var(--text-primary)' }">
+            <h2 class="text-lg font-bold mb-4" :style="{ color: 'var(--text-primary)' }">Recommended Next Steps</h2>
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div v-for="(vid, i) in relatedVideos" :key="i"
                 class="group flex gap-3 p-3 rounded-xl hover:bg-gray-50 cursor-pointer transition"
                 :style="{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-bg-card-hover, transparent)'}">
                 <img :src="vid.thumbnail" class="w-24 h-16 object-cover rounded-lg" :style="{ backgroundColor: 'var(--media-bg, #e5e7eb)'}" />
                 <div class="flex flex-col justify-center">
-                  <h3 class="text-sm font-bold group-hover:text-blue-600 line-clamp-2" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ vid.title }}
+                  <h3 class="text-sm font-bold group-hover:text-blue-600 line-clamp-2" :style="{ color: 'var(--text-primary)' }">{{ vid.title }}
                   </h3>
-                  <a :href="`https://www.youtube.com/results?search_query=${encodeURIComponent(vid.title)}`" target="_blank" class="text-xs hover:underline mt-1" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Search on YouTube ↗</a>
+                  <a :href="`https://www.youtube.com/results?search_query=${encodeURIComponent(vid.title)}`" target="_blank" class="text-xs hover:underline mt-1" :style="{ color: 'var(--text-primary)' }">Search on YouTube ↗</a>
                 </div>
               </div>
             </div>
           </div>
         </div>
 
-        <div v-if="showChat" class="w-full lg:w-[400px] shadow-lg rounded-2xl flex flex-col h-[calc(100vh-140px)] sticky top-6" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
-          <div class="p-4 border-b flex justify-between items-center rounded-t-2xl" :style="{ borderColor: 'var(--color-border)', backgroundColor: 'var(--page-bg)', color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
-            <h3 class="font-bold" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Chat with Video</h3>
-            <span class="text-xs bg-blue-100 px-2 py-0.5 rounded-full font-bold" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">AI Active</span>
+        <div v-if="showChat" class="w-full lg:w-[400px] shadow-lg rounded-2xl flex flex-col h-[calc(100vh-140px)] sticky top-6" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)', color: 'var(--text-primary)' }">
+          <div class="p-4 border-b flex justify-between items-center rounded-t-2xl" :style="{ borderColor: 'var(--color-border)', backgroundColor: 'var(--page-bg)', color: 'var(--text-primary)' }">
+            <h3 class="font-bold" :style="{ color: 'var(--text-primary)' }">Chat with Video</h3>
+            <span class="text-xs bg-blue-100 px-2 py-0.5 rounded-full font-bold" :style="{ color: 'var(--text-primary)' }">AI Active</span>
           </div>
           <div ref="chatContainer" class="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
             <div v-for="(msg, i) in chatHistory" :key="i" class="flex"
               :class="msg.role === 'user' ? 'justify-end' : 'justify-start'">
               <div class="max-w-[85%] p-3.5 rounded-2xl text-sm leading-relaxed shadow-sm"
                 :class="msg.role === 'user' ? 'bg-blue-600 text-white rounded-tr-none' : 'bg-gray-100 rounded-tl-none'"
-                :style="msg.role !== 'user' ? { backgroundColor: 'var(--message-bg, #f3f4f6)', color: themeStore.currentTheme === 'dark' ? 'white' : 'black' } : { color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
+                :style="msg.role !== 'user' ? { backgroundColor: 'var(--message-bg, #f3f4f6)', color: 'var(--text-primary)' } : { color: 'var(--text-primary)' }">
                 <div v-if="msg.loading" class="flex items-center gap-2 py-1">
                   <svg class="animate-spin h-4 w-4" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'gray' }" xmlns="http://www.w3.org/2000/svg" fill="none"
                     viewBox="0 0 24 24">
@@ -229,17 +229,17 @@ function scrollToBottom() {
                     </path>
                   </svg>
 
-                  <span class="text-sm font-medium italic animate-pulse" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Thinking...</span>
+                  <span class="text-sm font-medium italic animate-pulse" :style="{ color: 'var(--text-primary)' }">Thinking...</span>
                 </div>
                 <div v-else v-html="md.render(msg.text)"></div>
               </div>
             </div>
           </div>
-          <div class="p-4 border-t rounded-b-2xl flex gap-2" :style="{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-bg-card)', color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
+          <div class="p-4 border-t rounded-b-2xl flex gap-2" :style="{ borderColor: 'var(--color-border)', backgroundColor: 'var(--color-bg-card)', color: 'var(--text-primary)' }">
             <input v-model="chatInput" @keyup.enter="askQuestion" type="text" placeholder="Ask follow-up..."
               class="flex-1 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500"
-              :style="{ backgroundColor: 'var(--input-bg)', color: themeStore.currentTheme === 'dark' ? 'white' : 'black', borderColor: 'var(--color-border)' }" />
-            <button @click="askQuestion" class="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">➤</button>
+              :style="{ backgroundColor: 'var(--input-bg)', color: 'var(--text-primary)', borderColor: 'var(--color-border)' }" />
+            <button @click="askQuestion" class="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition" :style="{ color: 'var(--text-primary)' }">➤</button>
           </div>
         </div>
 

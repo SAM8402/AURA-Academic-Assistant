@@ -1,15 +1,21 @@
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from typing import List
+from typing import List, Optional
 from pydantic import BaseModel, EmailStr
-from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
+try:
+    from fastapi_mail import FastMail, MessageSchema, ConnectionConfig, MessageType
+    FASTAPI_MAIL_AVAILABLE = True
+except ImportError:
+    FASTAPI_MAIL_AVAILABLE = False
+    FastMail = MessageSchema = ConnectionConfig = MessageType = None
 import tempfile
 import os
 import logging
 
 # Import database session dependency
 from app.core.db import get_db
+from app.api.dependencies import get_current_user
 from app.core.config import settings
 
 # Configure logging
@@ -25,6 +31,8 @@ from app.services.doubt_export_service import doubt_export_service
 # Email Configuration
 def get_mail_config():
     """Get email configuration, return None if not configured"""
+    if not FASTAPI_MAIL_AVAILABLE:
+        return None
     if not settings.SMTP_USER or not settings.SMTP_PASSWORD:
         return None
     
@@ -51,6 +59,9 @@ async def send_email_background(recipient_email: str, course_code: str, period: 
     Background task to send email asynchronously.
     This prevents blocking the API response.
     """
+    if not FASTAPI_MAIL_AVAILABLE:
+        logger.error("fastapi-mail not installed. Cannot send email.")
+        return
     temp_path = None
     try:
         conf = get_mail_config()
@@ -140,7 +151,7 @@ router = APIRouter(
 
 # Upload Doubt Messages
 @router.post("/upload", response_model=dict)
-def upload_doubts(payload: DoubtUploadCreate, db: Session = Depends(get_db), user_id: int = 1):
+def upload_doubts(payload: DoubtUploadCreate, db: Session = Depends(get_db), current_user = Depends(get_current_user)):
     """
     Upload student doubts for a course with metadata.
     user_id can be replaced with authentication dependency.
@@ -155,7 +166,7 @@ def upload_doubts(payload: DoubtUploadCreate, db: Session = Depends(get_db), use
 async def get_doubt_summary(
     course_code: str,
     db: Session = Depends(get_db),
-    period: str = None,
+    period: Optional[str] = None,
     source: str = None
 ):
     """
@@ -204,7 +215,7 @@ async def get_doubt_summary(
 async def get_topic_clusters(
     course_code: str,
     db: Session = Depends(get_db),
-    period: str = None,
+    period: Optional[str] = None,
     source: str = None
 ):
     """
@@ -224,7 +235,7 @@ async def get_topic_clusters(
 async def get_teacher_insights(
     course_code: str,
     db: Session = Depends(get_db),
-    period: str = None,
+    period: Optional[str] = None,
     source: str = None
 ):
     """
@@ -244,7 +255,7 @@ async def get_teacher_insights(
 def get_source_breakdown(
     course_code: str,
     db: Session = Depends(get_db),
-    period: str = None
+    period: Optional[str] = None
 ):
     """
     Get breakdown of doubts by source (forum, email, chat) with counts and percentages.
@@ -273,7 +284,7 @@ class EmailReportRequest(BaseModel):
 async def export_summary_pdf(
     course_code: str,
     db: Session = Depends(get_db),
-    period: str = None,
+    period: Optional[str] = None,
     source: str = None
 ):
     """
@@ -318,7 +329,7 @@ async def export_summary_pdf(
 async def export_summary_csv(
     course_code: str,
     db: Session = Depends(get_db),
-    period: str = None,
+    period: Optional[str] = None,
     source: str = None
 ):
     """

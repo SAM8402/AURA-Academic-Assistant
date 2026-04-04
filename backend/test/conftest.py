@@ -16,6 +16,11 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from fastapi.testclient import TestClient
 
+# Set test environment variables before importing app
+os.environ.setdefault("SECRET_KEY", "test-secret-key-for-testing-only-32chars")
+os.environ.setdefault("GOOGLE_API_KEY", "test-api-key-for-testing-only")
+os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
+
 # Add parent directory to path so we can import app modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -45,8 +50,8 @@ from app.core.security import create_tokens
 # Test Database Configuration
 # ============================================================================
 
-# Use in-memory SQLite database for tests
-TEST_DATABASE_URL = "sqlite:///./test.db"
+# Use SQLite database for tests
+TEST_DATABASE_URL = os.environ.get("DATABASE_URL", "sqlite:///./test.db")
 
 # Create test engine
 test_engine = create_engine(

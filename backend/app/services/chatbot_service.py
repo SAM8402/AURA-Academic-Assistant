@@ -2,6 +2,7 @@
 Async Chatbot Service using LangChain and Google Gemini.
 """
 
+import logging
 import uuid
 from typing import Dict, Optional, AsyncIterator, Any, TYPE_CHECKING
 from datetime import datetime
@@ -18,13 +19,14 @@ try:
     LANGCHAIN_AVAILABLE = True
 except ImportError:
     LANGCHAIN_AVAILABLE = False
-    # Define fallback types when LangChain is not available
     ChatGoogleGenerativeAI = None  # type: ignore
     ConversationBufferMemory = None  # type: ignore
     ConversationChain = None  # type: ignore
 
 from app.core.config import settings
 from app.schemas.chatbot_schema import ChatMode
+
+logger = logging.getLogger(__name__)
 
 
 class ChatbotService:
@@ -36,11 +38,11 @@ class ChatbotService:
         self.llm = None
 
         if not LANGCHAIN_AVAILABLE:
-            print("[WARNING] Install: pip install langchain langchain-google-genai")
+            logger.error("langchain or langchain-google-genai is not installed. Run: pip install langchain langchain-google-genai")
             return
 
         if not settings.GOOGLE_API_KEY:
-            print("[WARNING] Add GOOGLE_API_KEY to .env file")
+            logger.error("GOOGLE_API_KEY is not configured. Add it to the .env file.")
             return
 
         try:
@@ -49,11 +51,10 @@ class ChatbotService:
                 google_api_key=settings.GOOGLE_API_KEY,
                 temperature=settings.GEMINI_TEMPERATURE,
                 max_output_tokens=settings.GEMINI_MAX_TOKENS,
-                convert_system_message_to_human=True
             )
-            print("[OK] Gemini LLM initialized successfully")
+            logger.info("Gemini LLM initialized successfully")
         except Exception as e:
-            print(f"[ERROR] Failed to initialize Gemini: {e}")
+            logger.error("Failed to initialize Gemini LLM: %s", e)
 
     async def chat(
         self,
@@ -77,32 +78,27 @@ class ChatbotService:
 
         if not self.llm:
             return (
-                "[WARNING] Chatbot not configured. Please add GOOGLE_API_KEY to .env and install dependencies.",
+                "Chatbot is not configured. Please ensure GOOGLE_API_KEY is set and dependencies are installed.",
                 conversation_id
             )
 
         try:
-            # Get or create conversation
             memory = self._get_or_create_memory(conversation_id)
-
-            # Get system prompt based on mode
             system_prompt = self._get_system_prompt(mode)
 
-            # Create conversation chain
             conversation = ConversationChain(
                 llm=self.llm,
                 memory=memory,
                 verbose=False
             )
 
-            # Generate response
             response = await conversation.apredict(input=message)
 
             return response, conversation_id
 
         except Exception as e:
-            print(f"Chat error: {e}")
-            return f"I apologize, but I encountered an error: {str(e)}", conversation_id
+            logger.error("Chat error for conversation %s: %s", conversation_id, e, exc_info=True)
+            return "I apologize, but something went wrong while processing your request. Please try again.", conversation_id
 
     async def chat_stream(
         self,
@@ -122,28 +118,27 @@ class ChatbotService:
             Response chunks as they're generated
         """
         if not self.llm:
-            yield "[WARNING] Chatbot not configured. Add GOOGLE_API_KEY to .env"
+            yield "Chatbot is not configured. Please ensure GOOGLE_API_KEY is set and dependencies are installed."
             return
 
-        try:
-            # For streaming, we'll use astream from LangChain
-            memory = self._get_or_create_memory(conversation_id or f"conv-{uuid.uuid4().hex[:12]}")
+        conv_id = conversation_id or f"conv-{uuid.uuid4().hex[:12]}"
 
-            # Add user message to memory
+        try:
+            memory = self._get_or_create_memory(conv_id)
+
             memory.chat_memory.add_user_message(message)
 
-            # Stream response
             full_response = ""
             async for chunk in self.llm.astream(message):
                 content = chunk.content if hasattr(chunk, 'content') else str(chunk)
                 full_response += content
                 yield content
 
-            # Add assistant response to memory
             memory.chat_memory.add_ai_message(full_response)
 
         except Exception as e:
-            yield f"Error: {str(e)}"
+            logger.error("Streaming chat error for conversation %s: %s", conv_id, e, exc_info=True)
+            yield "I apologize, but something went wrong while processing your request. Please try again."
 
     def _get_or_create_memory(self, conversation_id: str) -> Any:
         """Get or create conversation memory."""
@@ -157,10 +152,47 @@ class ChatbotService:
     def _get_system_prompt(self, mode: ChatMode) -> str:
         """Get system prompt based on mode."""
         prompts = {
-            ChatMode.ACADEMIC: "You are AURA, an academic AI assistant. Provide clear, educational explanations with examples.",
-            ChatMode.DOUBT_CLARIFICATION: "You are AURA, helping students clarify doubts. Ask clarifying questions and provide step-by-step explanations.",
-            ChatMode.STUDY_HELP: "You are AURA, a study assistant. Help with study strategies, time management, and learning techniques.",
-            ChatMode.GENERAL: "You are AURA, an AI teaching assistant. Be helpful, educational, and encouraging."
+            ChatMode.ACADEMIC: (
+                "You are AURA, an AI academic assistant specializing in computer science, software engineering, "
+                "and related technical disciplines.\n\n"
+                "Guidelines:\n"
+                "- Provide thorough, well-structured explanations using clear language.\n"
+                "- Use concrete examples, analogies, and code snippets when relevant.\n"
+                "- Cite concepts, theories, or documentation where appropriate.\n"
+                "- Break complex topics into smaller, digestible sections with headings.\n"
+                "- When a question is ambiguous, state your interpretation before answering.\n"
+                "- Encourage critical thinking — do not simply give answers; explain the reasoning behind them."
+            ),
+            ChatMode.DOUBT_CLARIFICATION: (
+                "You are AURA, a patient and supportive AI tutor focused on helping students understand difficult concepts.\n\n"
+                "Guidelines:\n"
+                "- Start by restating the student's question to confirm understanding.\n"
+                "- Ask one or two clarifying questions if the doubt is vague or incomplete.\n"
+                "- Provide step-by-step explanations, guiding the student toward the answer rather than revealing it outright.\n"
+                "- Highlight common misconceptions related to the topic.\n"
+                "- Summarize the key takeaway at the end of your response.\n"
+                "- Keep the tone encouraging and non-judgmental — mistakes are part of learning."
+            ),
+            ChatMode.STUDY_HELP: (
+                "You are AURA, an AI study coach dedicated to helping students learn more effectively.\n\n"
+                "Guidelines:\n"
+                "- Offer practical, actionable study strategies (e.g., spaced repetition, active recall, Pomodoro technique).\n"
+                "- Help students build realistic study schedules based on their goals and available time.\n"
+                "- Recommend resources such as textbooks, online courses, documentation, or practice platforms.\n"
+                "- Suggest techniques for managing exam stress and maintaining motivation.\n"
+                "- Adapt your advice to the student's level (beginner, intermediate, advanced).\n"
+                "- Be concise and action-oriented — students should leave with a clear next step."
+            ),
+            ChatMode.GENERAL: (
+                "You are AURA, a friendly and knowledgeable AI teaching assistant.\n\n"
+                "Guidelines:\n"
+                "- Be helpful, accurate, and concise in your responses.\n"
+                "- Adapt your tone to be professional yet approachable.\n"
+                "- If you do not know something, say so honestly rather than guessing.\n"
+                "- When relevant, suggest follow-up questions or related topics the user might explore.\n"
+                "- Use formatting (bullet points, numbered lists, code blocks) to improve readability.\n"
+                "- Maintain a positive and encouraging demeanor in all interactions."
+            ),
         }
         return prompts.get(mode, prompts[ChatMode.GENERAL])
 

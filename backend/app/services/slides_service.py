@@ -65,8 +65,7 @@ class SlidesService:
             self.llm = ChatGoogleGenerativeAI(
                 model=settings.GEMINI_MODEL,
                 api_key=settings.GOOGLE_API_KEY,
-                temperature=0.7,  # A bit more creative for slide content
-                convert_system_message_to_human=True
+                temperature=0.7  # A bit more creative for slide content
             )
             logger.info(f"[OK] SlidesService initialized with Gemini model: {settings.GEMINI_MODEL}")
         except Exception as e:

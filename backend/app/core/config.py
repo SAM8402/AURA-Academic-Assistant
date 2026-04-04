@@ -53,8 +53,8 @@ class Settings(BaseSettings):
 
     # Security Settings
     SECRET_KEY: str = Field(
-        default="09d25e094faa6ca2556c818166b7a9563b93f7099f6f0f4caa6cf63b88e8d3e7",
-        description="Secret key for JWT encoding (CHANGE IN PRODUCTION!)"
+        default="change_me_generate_with_secrets_token_hex_32",
+        description="Secret key for JWT encoding (REQUIRED - set in .env)"
     )
     ALGORITHM: str = Field(
         default="HS256",
@@ -172,9 +172,8 @@ class Settings(BaseSettings):
 
     # AI/LLM Settings (Gemini)
     GOOGLE_API_KEY: str = Field(
-        default="AIzaSyBFw3rXmpqtrcZU5v2btSe-0rz-e9N5jxI",
-        description="Google Gemini API Key (get from https://makersuite.google.com/app/apikey)"
-        
+        default="",
+        description="Google Gemini API Key (REQUIRED - get from https://makersuite.google.com/app/apikey)"
     )
     GEMINI_MODEL: str = Field(
         default="gemini-2.5-flash",
@@ -201,11 +200,28 @@ class Settings(BaseSettings):
         """Pydantic configuration."""
         env_file = ".env"
         env_file_encoding = "utf-8"
-        case_sensitive = True
+        case_sensitive = False
 
 
 # Create settings instance
 settings = Settings()
+
+
+# Validate required settings on import
+if not settings.SECRET_KEY or settings.SECRET_KEY == "change_me_generate_with_secrets_token_hex_32":
+    import warnings
+    warnings.warn(
+        "SECRET_KEY is not set! Generate one with: python -c 'import secrets; print(secrets.token_hex(32))'",
+        stacklevel=2
+    )
+
+if not settings.GOOGLE_API_KEY:
+    import warnings
+    warnings.warn(
+        "GOOGLE_API_KEY is not set! AI features will not work. "
+        "Get a key from: https://makersuite.google.com/app/apikey",
+        stacklevel=2
+    )
 
 
 # Helper function to get settings

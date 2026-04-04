@@ -257,15 +257,16 @@ export default {
 /* Inputs */
 input.form-control {
   padding: 0.9rem 1.1rem;
-  border: 1px solid #efc806;
-
+  border: 1px solid var(--input-border, #dee2e6);
   font-size: 1rem;
+  background-color: var(--input-bg, #fff);
+  color: var(--input-text, #1a1a1a);
 }
 
 input.form-control:focus {
-  border-color: #1976d2;
-  box-shadow: 0 0 10px rgba(25, 118, 210, 0.3);
-
+  border-color: var(--input-focus, #1976d2);
+  box-shadow: 0 0 0 3px rgba(25, 118, 210, 0.15);
+  outline: none;
 }
 
 /* Prevent auto shrink on zoom */

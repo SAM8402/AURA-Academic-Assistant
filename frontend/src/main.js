@@ -6,9 +6,6 @@ import router from './router'
 // ✅ Tailwind
 import './style.css'
 
-// ✅ Theme System
-import './styles/theme.css'
-
 // ✅ Bootstrap
 import 'bootstrap/dist/css/bootstrap.min.css'
 import 'bootstrap-icons/font/bootstrap-icons.css'

@@ -7,11 +7,12 @@ Provides comprehensive analytics and metrics for system monitoring.
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, and_, case, extract
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from typing import Optional
 
 from app.core.db import get_db
-from app.models.user import User, UserRole
+from app.models.user import User
+from app.schemas.user_schema import UserRole
 from app.models.query import Query as QueryModel, QueryResponse
 from app.models.knowledge import KnowledgeSource
 from app.models.chat_session import ChatSession
@@ -53,7 +54,7 @@ async def get_overview_metrics(
 ):
     """Get overall system metrics."""
 
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     today_start = datetime(now.year, now.month, now.day)
     week_start = now - timedelta(days=7)
 
@@ -151,7 +152,7 @@ async def get_faqs(
 ):
     """Get frequently asked questions."""
 
-    cutoff_date = datetime.utcnow() - timedelta(days=days)
+    cutoff_date = datetime.now(UTC) - timedelta(days=days)
 
     # Group by similar titles (case-insensitive)
     # Count occurrences and get metadata
@@ -346,7 +347,7 @@ async def get_sentiment_analysis(
     ).scalar() or 0
 
     # Negative: Open queries older than 24 hours with no responses
-    cutoff = datetime.utcnow() - timedelta(hours=24)
+    cutoff = datetime.now(UTC) - timedelta(hours=24)
     negative_count = db.query(func.count(QueryModel.id)).filter(
         and_(
             QueryModel.status == QueryStatus.OPEN,
@@ -418,7 +419,7 @@ async def get_usage_statistics(
 ):
     """Get active users, API calls, and session stats."""
 
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     today_start = datetime(now.year, now.month, now.day)
     week_start = now - timedelta(days=7)
     month_start = now - timedelta(days=30)

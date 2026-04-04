@@ -8,13 +8,14 @@ for the instructor dashboard.
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, and_, case, extract, or_
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 from typing import Optional, List
 from collections import defaultdict
 import re
 
 from app.core.db import get_db
-from app.models.user import User, UserRole
+from app.models.user import User
+from app.schemas.user_schema import UserRole
 from app.models.query import Query as QueryModel, QueryResponse
 from app.models.chat_session import ChatSession
 from app.schemas.query_schema import QueryStatus, QueryCategory
@@ -56,7 +57,7 @@ def calculate_sentiment_from_query(query: QueryModel) -> str:
 
     # Open queries older than 24 hours without responses = negative
     if query.status == QueryStatus.OPEN:
-        age_hours = (datetime.utcnow() - query.created_at).total_seconds() / 3600
+        age_hours = (datetime.now(UTC) - query.created_at).total_seconds() / 3600
         if age_hours > 24 and len(query.responses) == 0:
             return 'negative'
         elif age_hours > 48:
@@ -144,7 +145,7 @@ async def get_discussion_summaries(
 ):
     """Get discussion summaries with sentiment analysis."""
 
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     cutoff_date = now - timedelta(days=days)
 
     # ========== OVERVIEW METRICS ==========
@@ -411,7 +412,7 @@ async def get_topic_clusters(
 ):
     """Get topic clustering for queries."""
 
-    cutoff_date = datetime.utcnow() - timedelta(days=days)
+    cutoff_date = datetime.now(UTC) - timedelta(days=days)
 
     # Get all queries in time period
     queries = db.query(QueryModel).filter(
@@ -480,7 +481,7 @@ async def get_realtime_sentiment(
 ):
     """Get real-time sentiment data for live charts."""
 
-    now = datetime.utcnow()
+    now = datetime.now(UTC)
     cutoff = now - timedelta(hours=hours)
 
     # Get queries in time range

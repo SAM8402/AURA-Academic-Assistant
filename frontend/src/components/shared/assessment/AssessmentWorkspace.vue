@@ -146,7 +146,14 @@ async function generate(){
     const res = await api.post('/quizzes/generate', payload, { timeout: 60000 })
     quizId.value = res.data?.id || null
     successMessage.value = `Quiz "${form.title}" generated successfully!`
-  } catch(e){ error.value = e.response?.data?.detail || e.message }
+  } catch(e){ 
+    const detail = e.response?.data?.detail
+    if (Array.isArray(detail)) {
+      error.value = detail.map(err => `${err.loc?.join('.')} - ${err.msg}`).join('; ')
+    } else {
+      error.value = detail || e.message
+    }
+  }
   finally { generating.value=false }
 }
 

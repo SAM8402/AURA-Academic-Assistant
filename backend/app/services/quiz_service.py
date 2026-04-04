@@ -24,7 +24,6 @@ except ImportError:
 
 from app.core.config import settings
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ============================================================================
@@ -74,7 +73,6 @@ class QuizService:
                 model=settings.GEMINI_MODEL,
                 google_api_key=settings.GOOGLE_API_KEY,
                 temperature=0.6,  # Slightly creative but still factual for quizzes
-                convert_system_message_to_human=True
             )
             logger.info(f"[OK] QuizService initialized with Gemini model: {settings.GEMINI_MODEL}")
         except Exception as e:
@@ -147,8 +145,8 @@ class QuizService:
             logger.info("Successfully generated quiz.")
             return quiz_data
         except Exception as e:
-            logger.error(f"Failed to generate or parse quiz: {e}")
-            return {"error": f"An error occurred while generating the quiz: {str(e)}"}
+            logger.error("Failed to generate or parse quiz", exc_info=True)
+            return {"error": "An error occurred while generating the quiz. Please try again later."}
 
 
     async def update_quiz(self, quiz_data: Dict[str, Any], feedback: str) -> Dict[str, Any]:
@@ -206,8 +204,8 @@ class QuizService:
             logger.info("Successfully updated quiz.")
             return updated_quiz_data
         except Exception as e:
-            logger.error(f"Failed to update or parse quiz: {e}")
-            return {"error": f"An error occurred while updating the quiz: {str(e)}"}
+            logger.error("Failed to update or parse quiz", exc_info=True)
+            return {"error": "An error occurred while updating the quiz. Please try again later."}
 
 
 # global instance 

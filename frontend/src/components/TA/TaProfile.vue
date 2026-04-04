@@ -2,7 +2,7 @@
 import { ref, onMounted } from 'vue'
 import { api } from '@/api'
 import { useThemeStore } from '@/stores/theme'
-import Sidebar from '@/components/layout/TaLayout/TASideBar.vue'
+import Sidebar from '@/components/layout/TaLayout/TASidebar.vue'
 import HeaderBar from '@/components/layout/TaLayout/TaHeaderBar.vue'
 
 import {

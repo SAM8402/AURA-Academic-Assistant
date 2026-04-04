@@ -54,8 +54,6 @@ class TestHealthCheck:
         assert "status" in data
         assert "app_name" in data
         assert "version" in data
-        assert "environment" in data
-        assert "database" in data
 
     def test_health_check_status_healthy(self, client: TestClient):
         """Test that health check returns healthy status."""
@@ -85,22 +83,22 @@ class TestHealthCheck:
         assert len(data["version"]) > 0
 
     def test_health_check_environment(self, client: TestClient):
-        """Test that health check returns environment."""
+        """Test that health check does NOT expose environment for security."""
         response = client.get("/health")
 
         assert response.status_code == 200
         data = response.json()
 
-        assert data["environment"] in ["development", "production"]
+        assert "environment" not in data
 
     def test_health_check_database(self, client: TestClient):
-        """Test that health check confirms database connection."""
+        """Test that health check does NOT expose database info for security."""
         response = client.get("/health")
 
         assert response.status_code == 200
         data = response.json()
 
-        assert data["database"] == "connected"
+        assert "database" not in data
 
     def test_health_check_no_auth_required(self, client: TestClient):
         """Test that health check doesn't require authentication."""

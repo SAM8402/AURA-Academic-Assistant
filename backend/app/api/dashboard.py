@@ -8,10 +8,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import Optional
-from datetime import datetime, timedelta
+from datetime import datetime, UTC, timedelta
 
 from app.core.db import get_db
 from app.api.dependencies import get_current_user
+from app.schemas.user_schema import UserRole
+from app.core.security import is_ta_or_above
 from app.models.user import User
 from app.models.knowledge import KnowledgeSource
 from app.models.query import Query as QueryModel
@@ -49,7 +51,7 @@ async def get_dashboard_statistics(
         total_queries = db.query(QueryModel).count()
 
         # Recent activity (last 7 days)
-        week_ago = datetime.utcnow() - timedelta(days=7)
+        week_ago = datetime.now(UTC) - timedelta(days=7)
         recent_sources = db.query(KnowledgeSource).filter(
             KnowledgeSource.created_at >= week_ago
         ).count()
@@ -73,7 +75,7 @@ async def get_dashboard_statistics(
             },
             "system": {
                 "status": "healthy",
-                "timestamp": datetime.utcnow().isoformat()
+                "timestamp": datetime.now(UTC).isoformat()
             }
         }
 
@@ -99,13 +101,13 @@ async def get_activity_timeline(
     - User registrations
     """
     try:
-        start_date = datetime.utcnow() - timedelta(days=days)
+        start_date = datetime.now(UTC) - timedelta(days=days)
 
         # For simplicity, return aggregated data
         # In production, you'd group by date
         timeline = []
         for i in range(days):
-            day = datetime.utcnow() - timedelta(days=i)
+            day = datetime.now(UTC) - timedelta(days=i)
             day_start = day.replace(hour=0, minute=0, second=0, microsecond=0)
             day_end = day_start + timedelta(days=1)
 

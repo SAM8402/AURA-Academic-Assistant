@@ -13,7 +13,7 @@ from app.models.chat_session import ChatSession
 from app.schemas.chatbot_schema import ChatRequest, ChatResponse, ChatMode
 from app.api.dependencies import get_current_user
 from app.services.chatbot_service_hybrid import hybrid_chatbot_service as chatbot_service
-from datetime import datetime
+from datetime import datetime, UTC
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
 import uuid
@@ -171,7 +171,7 @@ def get_or_create_chat_session(
         "user_email": user.email,
         "user_role": user.role.value if hasattr(user.role, 'value') else str(user.role),
         "conversation_id": conversation_id,
-        "started_at": datetime.utcnow().isoformat(),
+        "started_at": datetime.now(UTC).isoformat(),
         "message_count": 0,
         "messages": [],  # Store conversation messages
         "summary": ""    # Will store conversation summary
@@ -220,12 +220,12 @@ def update_chat_session_with_message(
         messages.append({
             "role": "user",
             "content": user_message[:500],  # Truncate long messages
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(UTC).isoformat()
         })
         messages.append({
             "role": "assistant",
             "content": ai_response[:500],  # Truncate long responses
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(UTC).isoformat()
         })
         # Keep only last 20 messages (10 exchanges)
         current_metadata["messages"] = messages[-20:]
@@ -237,13 +237,13 @@ def update_chat_session_with_message(
                 summary_parts.append(f"Q: {msg['content'][:100]}")
 
         current_metadata["summary"] = " | ".join(summary_parts) if summary_parts else "Conversation started"
-        current_metadata["last_message_at"] = datetime.utcnow().isoformat()
+        current_metadata["last_message_at"] = datetime.now(UTC).isoformat()
 
         if conversation_id:
             current_metadata["conversation_id"] = conversation_id
 
         session.metadata_ = current_metadata
-        session.updated_at = datetime.utcnow()
+        session.updated_at = datetime.now(UTC)
 
         # Tell SQLAlchemy that the JSON field has been modified
         flag_modified(session, "metadata_")
@@ -342,13 +342,13 @@ Remember to personalize your response based on the user's conversation history a
             response=response,
             conversation_id=conv_id,
             model=chatbot_service.llm.model if chatbot_service.llm else "fallback",
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(UTC)
         )
 
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Chat error: {str(e)}"
+            detail="Chat service temporarily unavailable"
         )
 
 
@@ -655,7 +655,7 @@ async def chat_enhanced(
             knowledge_sources_used=response.get("knowledge_sources_used", 0),
             sources=response.get("sources", []),
             user_context=response.get("user_context", {}),
-            timestamp=datetime.utcnow().isoformat()
+            timestamp=datetime.now(UTC).isoformat()
         )
 
     except Exception as e:
@@ -671,7 +671,7 @@ async def chat_enhanced(
             knowledge_sources_used=0,
             sources=[],
             user_context={},
-            timestamp=datetime.utcnow().isoformat()
+            timestamp=datetime.now(UTC).isoformat()
         )
 
 
@@ -801,7 +801,7 @@ async def answer_query(
             "answer": response["answer"],
             "sources_used": response.get("sources_used", []),
             "confidence": response.get("confidence", "medium"),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now(UTC).isoformat()
         }
 
     except HTTPException:

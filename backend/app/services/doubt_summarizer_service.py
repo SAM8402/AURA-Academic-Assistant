@@ -1,4 +1,5 @@
 import logging
+from datetime import timezone
 from typing import List, Dict, Any
 from sqlalchemy.orm import Session
 
@@ -27,7 +28,6 @@ except ImportError:
         GEMINI_MODEL = "gemini-2.5-flash"
     settings = MockSettings()
 
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # -----------------------------------------------------------------------------
@@ -52,7 +52,7 @@ class DoubtSummarizerService:
             return
 
         if not settings.GOOGLE_API_KEY:
-            logger.warning("⚠️ Google API Key missing — LLM disabled.")
+            logger.warning("[WARNING] Google API Key missing - LLM disabled.")
             return
 
         try:
@@ -60,8 +60,7 @@ class DoubtSummarizerService:
             self.llm = ChatGoogleGenerativeAI(
                 model=settings.GEMINI_MODEL,
                 google_api_key=settings.GOOGLE_API_KEY,
-                temperature=0.2,
-                convert_system_message_to_human=True
+                temperature=0.2
             )
             logger.info("DoubtSummarizerService initialized successfully.")
         except Exception as e:
@@ -74,28 +73,32 @@ class DoubtSummarizerService:
         """
         Saves the upload metadata and related messages into the database.
         """
-
-        # Create upload
-        new_upload = DoubtUpload(
-            course_code=upload_in.course_code,
-            source=upload_in.source,
-            created_by_id=user_id
-        )
-        db.add(new_upload)
-        db.commit()
-        db.refresh(new_upload)
-
-        # Create messages
-        for msg in upload_in.messages:
-            new_message = DoubtMessage(
-                upload_id=new_upload.id,
-                author_role=msg.get("author_role", "student"),
-                text=msg.get("text")
+        try:
+            # Create upload
+            new_upload = DoubtUpload(
+                course_code=upload_in.course_code,
+                source=upload_in.source,
+                created_by_id=user_id
             )
-            db.add(new_message)
+            db.add(new_upload)
+            db.commit()
+            db.refresh(new_upload)
 
-        db.commit()
-        return new_upload
+            # Create messages
+            for msg in upload_in.messages:
+                new_message = DoubtMessage(
+                    upload_id=new_upload.id,
+                    author_role=msg.get("author_role", "student"),
+                    text=msg.get("text")
+                )
+                db.add(new_message)
+
+            db.commit()
+            return new_upload
+        except Exception as e:
+            db.rollback()
+            logger.error(f"Error creating doubt upload: {e}")
+            raise
 
     # -------------------------------------------------------------------------
     # Task 2 — Fetch Recent Messages
@@ -117,34 +120,38 @@ class DoubtSummarizerService:
         """
         from datetime import datetime, timedelta
 
-        query = (
-            db.query(DoubtMessage.text)
-            .join(DoubtUpload, DoubtMessage.upload_id == DoubtUpload.id)
-            .filter(DoubtUpload.course_code == course_code)
-        )
+        try:
+            query = (
+                db.query(DoubtMessage.text)
+                .join(DoubtUpload, DoubtMessage.upload_id == DoubtUpload.id)
+                .filter(DoubtUpload.course_code == course_code)
+            )
 
-        # Apply period filter
-        if period:
-            now = datetime.utcnow()
-            if period == 'daily':
-                start_date = now - timedelta(days=1)
-            elif period == 'weekly':
-                start_date = now - timedelta(weeks=1)
-            elif period == 'monthly':
-                start_date = now - timedelta(days=30)
-            else:
-                start_date = None
-            
-            if start_date:
-                query = query.filter(DoubtUpload.created_at >= start_date)
+            # Apply period filter
+            if period:
+                now = datetime.now(timezone.utc)
+                if period == 'daily':
+                    start_date = now - timedelta(days=1)
+                elif period == 'weekly':
+                    start_date = now - timedelta(weeks=1)
+                elif period == 'monthly':
+                    start_date = now - timedelta(days=30)
+                else:
+                    start_date = None
+                
+                if start_date:
+                    query = query.filter(DoubtUpload.created_at >= start_date)
 
-        # Apply source filter
-        if source and source != 'all':
-            query = query.filter(DoubtUpload.source == source)
+            # Apply source filter
+            if source and source != 'all':
+                query = query.filter(DoubtUpload.source == source)
 
-        rows = query.order_by(DoubtUpload.created_at.desc()).limit(limit).all()
+            rows = query.order_by(DoubtUpload.created_at.desc()).limit(limit).all()
 
-        return [r[0] for r in rows]
+            return [r[0] for r in rows]
+        except Exception as e:
+            logger.error(f"Error fetching recent messages for course {course_code}: {e}")
+            return []
 
     # -------------------------------------------------------------------------
     # Task 3 — LLM Analysis (Summary + Topics + Insights)
@@ -167,16 +174,40 @@ class DoubtSummarizerService:
 
         prompt = PromptTemplate(
             template="""
-You are an expert academic assistant analyzing doubts for "{course_code}".
+You are an expert academic assistant analyzing student doubts and queries for the course "{course_code}".
 
-Analyze the following student queries:
+You will receive a list of student doubt messages extracted from forums, emails, and chat channels.
+
+## Your Task
+
+Analyze all the messages below and produce a structured JSON report.
+
+### Student Doubt Messages
 {doubts_text}
 
-Return ONLY valid JSON with:
-- overall_summary
-- topics (clusters)
-- learning_gaps
-- insights
+## Analysis Instructions
+
+1. **overall_summary**: Write a concise 3-5 sentence summary capturing the main themes, frequency of topics, and overall sentiment of the student doubts.
+
+2. **topics**: Group the doubts into thematic clusters. For each topic, provide:
+   - "name": A short descriptive topic name
+   - "keywords": A list of 3-5 relevant keywords
+   - "student_count": Approximate number of students asking about this topic
+   - "severity": "low", "medium", or "high" based on urgency and frequency
+
+3. **learning_gaps**: Identify specific conceptual misunderstandings or knowledge gaps evidenced by the doubts. For each gap:
+   - "concept": The specific concept students are struggling with
+   - "description": A brief explanation of the misunderstanding
+   - "student_count": Estimated number of students affected
+   - "suggested_action": A concrete recommendation for addressing this gap (e.g., extra tutorial, revised lecture notes, practice problems)
+
+4. **insights**: Provide actionable observations for the teaching team:
+   - Patterns in timing or context of doubts
+   - Correlations between topics
+   - Suggestions for proactive interventions
+   - Any signs of common misconceptions that could be addressed in class
+
+Return ONLY valid JSON matching the schema below. Do not include any text outside the JSON object.
 
 {format_instructions}
             """,
@@ -203,8 +234,8 @@ Return ONLY valid JSON with:
             
             return result
         except Exception as e:
-            logger.error(f"LLM Error: {e}")
-            return {"error": str(e)}
+            logger.error(f"LLM Error during summary generation for {course_code}: {e}")
+            return {"error": "An error occurred while generating the summary. Please try again later."}
 
     # -------------------------------------------------------------------------
     # Task 3.5 — Compute Enhanced Statistics
@@ -216,40 +247,44 @@ Return ONLY valid JSON with:
         from datetime import datetime, timedelta
         from sqlalchemy import func, distinct
 
-        query = (
-            db.query(
-                func.count(DoubtMessage.id).label('total_messages'),
-                func.count(distinct(DoubtUpload.id)).label('unique_uploads')
+        try:
+            query = (
+                db.query(
+                    func.count(DoubtMessage.id).label('total_messages'),
+                    func.count(distinct(DoubtUpload.id)).label('unique_uploads')
+                )
+                .join(DoubtUpload, DoubtMessage.upload_id == DoubtUpload.id)
+                .filter(DoubtUpload.course_code == course_code)
             )
-            .join(DoubtUpload, DoubtMessage.upload_id == DoubtUpload.id)
-            .filter(DoubtUpload.course_code == course_code)
-        )
 
-        # Apply period filter
-        if period:
-            now = datetime.utcnow()
-            if period == 'daily':
-                start_date = now - timedelta(days=1)
-            elif period == 'weekly':
-                start_date = now - timedelta(weeks=1)
-            elif period == 'monthly':
-                start_date = now - timedelta(days=30)
-            else:
-                start_date = None
-            
-            if start_date:
-                query = query.filter(DoubtUpload.created_at >= start_date)
+            # Apply period filter
+            if period:
+                now = datetime.now(timezone.utc)
+                if period == 'daily':
+                    start_date = now - timedelta(days=1)
+                elif period == 'weekly':
+                    start_date = now - timedelta(weeks=1)
+                elif period == 'monthly':
+                    start_date = now - timedelta(days=30)
+                else:
+                    start_date = None
+                
+                if start_date:
+                    query = query.filter(DoubtUpload.created_at >= start_date)
 
-        # Apply source filter
-        if source and source != 'all':
-            query = query.filter(DoubtUpload.source == source)
+            # Apply source filter
+            if source and source != 'all':
+                query = query.filter(DoubtUpload.source == source)
 
-        result = query.first()
+            result = query.first()
 
-        return {
-            'total_messages': result.total_messages if result else 0,
-            'unique_uploads': result.unique_uploads if result else 0
-        }
+            return {
+                'total_messages': result.total_messages if result else 0,
+                'unique_uploads': result.unique_uploads if result else 0
+            }
+        except Exception as e:
+            logger.error(f"Error computing summary stats for course {course_code}: {e}")
+            return {'total_messages': 0, 'unique_uploads': 0}
 
     # -------------------------------------------------------------------------
     # Task 4 — Get Source Breakdown
@@ -261,54 +296,58 @@ Return ONLY valid JSON with:
         from datetime import datetime, timedelta
         from sqlalchemy import func
 
-        query = (
-            db.query(
-                DoubtUpload.source,
-                func.count(DoubtMessage.id).label('count')
+        try:
+            query = (
+                db.query(
+                    DoubtUpload.source,
+                    func.count(DoubtMessage.id).label('count')
+                )
+                .join(DoubtMessage, DoubtUpload.id == DoubtMessage.upload_id)
+                .filter(DoubtUpload.course_code == course_code)
             )
-            .join(DoubtMessage, DoubtUpload.id == DoubtMessage.upload_id)
-            .filter(DoubtUpload.course_code == course_code)
-        )
 
-        # Apply period filter
-        if period:
-            now = datetime.utcnow()
-            if period == 'daily':
-                start_date = now - timedelta(days=1)
-            elif period == 'weekly':
-                start_date = now - timedelta(weeks=1)
-            elif period == 'monthly':
-                start_date = now - timedelta(days=30)
-            else:
-                start_date = None
+            # Apply period filter
+            if period:
+                now = datetime.now(timezone.utc)
+                if period == 'daily':
+                    start_date = now - timedelta(days=1)
+                elif period == 'weekly':
+                    start_date = now - timedelta(weeks=1)
+                elif period == 'monthly':
+                    start_date = now - timedelta(days=30)
+                else:
+                    start_date = None
+                
+                if start_date:
+                    query = query.filter(DoubtUpload.created_at >= start_date)
+
+            results = query.group_by(DoubtUpload.source).all()
+
+            # Calculate totals and percentages
+            total = sum(r.count for r in results)
+            breakdown = {}
             
-            if start_date:
-                query = query.filter(DoubtUpload.created_at >= start_date)
+            for result in results:
+                source_name = result.source
+                count = result.count
+                percentage = round((count / total * 100), 1) if total > 0 else 0
+                breakdown[source_name] = {
+                    "count": count,
+                    "percentage": percentage
+                }
 
-        results = query.group_by(DoubtUpload.source).all()
+            # Ensure all sources are present (even if 0)
+            for source in ['forum', 'email', 'chat']:
+                if source not in breakdown:
+                    breakdown[source] = {"count": 0, "percentage": 0}
 
-        # Calculate totals and percentages
-        total = sum(r.count for r in results)
-        breakdown = {}
-        
-        for result in results:
-            source_name = result.source
-            count = result.count
-            percentage = round((count / total * 100), 1) if total > 0 else 0
-            breakdown[source_name] = {
-                "count": count,
-                "percentage": percentage
+            return {
+                "total": total,
+                "breakdown": breakdown
             }
-
-        # Ensure all sources are present (even if 0)
-        for source in ['forum', 'email', 'chat']:
-            if source not in breakdown:
-                breakdown[source] = {"count": 0, "percentage": 0}
-
-        return {
-            "total": total,
-            "breakdown": breakdown
-        }
+        except Exception as e:
+            logger.error(f"Error computing source breakdown for course {course_code}: {e}")
+            return {"total": 0, "breakdown": {"forum": {"count": 0, "percentage": 0}, "email": {"count": 0, "percentage": 0}, "chat": {"count": 0, "percentage": 0}}}
 
     # -------------------------------------------------------------------------
     # Empty State

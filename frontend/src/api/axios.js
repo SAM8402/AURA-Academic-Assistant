@@ -5,13 +5,16 @@
 import axios from 'axios'
 import { useUserStore } from '@/stores/user'
 
+// Base URL from environment variable, falls back to localhost for development
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000/api'
+
 // Create axios instance with base configuration
 const api = axios.create({
-  baseURL: 'http://localhost:8000/api',
+  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 180000, // 10 seconds
+  timeout: 30000, // 30 seconds
 })
 
 // Request interceptor - Add JWT token to requests
@@ -49,7 +52,7 @@ api.interceptors.response.use(
 
         if (refreshToken) {
           // Try to refresh the token
-          const response = await axios.post('http://localhost:8000/api/auth/refresh', {
+          const response = await axios.post(`${API_BASE_URL}/auth/refresh`, {
             refresh_token: refreshToken
           })
 

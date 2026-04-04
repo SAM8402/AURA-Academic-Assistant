@@ -37,7 +37,7 @@ def create_course(
             detail="A course with this name already exists.",
         )
 
-    db_course = Course(**course_in.dict(), created_by_id=current_user.id)
+    db_course = Course(**course_in.model_dump(), created_by_id=current_user.id)
     db.add(db_course)
     db.commit()
     db.refresh(db_course)

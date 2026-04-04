@@ -393,7 +393,7 @@
 <script setup>
 import { ref } from 'vue'
 import { useThemeStore } from '@/stores/theme'
-import TASidebar from '@/components/layout/TaLayout/TASideBar.vue'
+import TASidebar from '@/components/layout/TaLayout/TASidebar.vue'
 import { PaperAirplaneIcon, ClockIcon } from '@heroicons/vue/24/outline'
 
 const activeTab = ref('mentor')

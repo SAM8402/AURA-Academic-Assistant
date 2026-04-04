@@ -78,7 +78,7 @@
         <button
           @click="resetTimer"
           class="px-6 py-2 bg-gray-200 font-medium rounded-lg hover:bg-gray-300 transition"
-          :style="{ color: themeStore?.currentTheme === 'dark' ? 'black' : 'black' }"
+          :style="{ color: 'var(--color-text-primary)' }"
         >
           Reset
         </button>

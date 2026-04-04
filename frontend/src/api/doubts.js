@@ -8,7 +8,7 @@ export const doubtsAPI = {
   },
   getSummary(courseCode, params = {}) {
     // params: { period, source }
-    return api.get(`/ta/doubts/summary/${encodeURIComponent(courseCode)}`, { params }).then(r => r.data)
+    return api.get(`/ta/doubts/summary/${encodeURIComponent(courseCode)}`, { params, timeout: 15000 }).then(r => r.data)
   },
   getTopics(courseCode, params = {}) {
     return api.get(`/ta/doubts/topics/${encodeURIComponent(courseCode)}`, { params }).then(r => r.data)
@@ -18,7 +18,7 @@ export const doubtsAPI = {
   },
   getSourceBreakdown(courseCode, params = {}) {
     // params: { period }
-    return api.get(`/ta/doubts/source-breakdown/${encodeURIComponent(courseCode)}`, { params }).then(r => r.data)
+    return api.get(`/ta/doubts/source-breakdown/${encodeURIComponent(courseCode)}`, { params, timeout: 15000 }).then(r => r.data)
   }
 }
 

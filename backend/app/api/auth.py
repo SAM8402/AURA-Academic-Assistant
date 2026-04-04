@@ -20,6 +20,7 @@ from app.models.profile import Profile
 from app.models.course import Course
 from app.models.user_course import UserCourse
 from app.schemas.user_schema import (
+    UserRole,
     UserCreate,
     UserResponse,
     UserLogin,
@@ -106,8 +107,15 @@ def signup(user_data: UserCreate, db: Session = Depends(get_db)):
             detail="Email already registered. Please use a different email or login."
         )
 
+    # Validate password strength
+    if len(user_data.password) < 8:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Password must be at least 8 characters long"
+        )
+
     # Validate course IDs for TA and Instructor roles
-    if user_data.role in ["ta", "instructor"]:
+    if user_data.role in [UserRole.TA, UserRole.INSTRUCTOR]:
         if not user_data.course_ids:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -136,7 +144,7 @@ def signup(user_data: UserCreate, db: Session = Depends(get_db)):
     db.refresh(user)
 
     # Assign courses to TA/Instructor
-    if user_data.role in ["ta", "instructor"] and user_data.course_ids:
+    if user_data.role in [UserRole.TA, UserRole.INSTRUCTOR] and user_data.course_ids:
         for course_id in user_data.course_ids:
             user_course = UserCourse(user_id=user.id, course_id=course_id)
             db.add(user_course)

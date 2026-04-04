@@ -1,5 +1,5 @@
 <template>
-  <div class="flex h-screen" :style="{ backgroundColor: 'var(--page-bg)', color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
+  <div class="flex h-screen" :style="{ backgroundColor: 'var(--page-bg)', color: 'var(--text-primary)' }">
     <!-- Sidebar -->
     <Sidebar />
 
@@ -17,22 +17,24 @@
           <!-- DASHBOARD PAGE -->
           <section v-show="activePage === 'dashboard'" class="space-y-6">
             <!-- Hero -->
-            <div class="bg-gradient-to-r from-blue-600 to-purple-600 rounded-xl p-6 text-white shadow">
-              <h2 class="text-2xl font-bold mb-1">Welcome back, {{ userName }}! 👋</h2>
-              <p class="opacity-90">Here's what's happening with your academics today.</p>
+            <div class="rounded-xl p-6 shadow" :style="{ background: 'linear-gradient(135deg, var(--accent-blue), var(--accent-purple))', color: '#ffffff' }">
+              <h2 class="text-2xl font-bold mb-1">Welcome back, {{ userName }}!</h2>
+              <p class="opacity-90">Here is what is happening with your academics today.</p>
             </div>
 
             <!-- Loading State -->
-            <div v-if="isLoading" class="text-center py-12">
-              <div class="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-              <p class="mt-4" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Loading your dashboard...</p>
-            </div>
+            <LoadingSpinner v-if="isLoading" :fullPage="true" text="Loading your dashboard..." size="lg" />
 
             <!-- Error State -->
-            <div v-else-if="error" class="bg-red-50 border border-red-200 rounded-xl p-6">
-              <h3 class="font-semibold mb-2" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Error Loading Dashboard</h3>
-              <p class="text-sm" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ error }}</p>
-              <button @click="loadDashboardData" class="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+            <div v-else-if="error" class="rounded-xl p-6 border" :style="{ backgroundColor: 'var(--error-bg)', borderColor: 'var(--accent-red)' }">
+              <h3 class="font-semibold mb-2" :style="{ color: 'var(--error-text)' }">Error Loading Dashboard</h3>
+              <p class="text-sm" :style="{ color: 'var(--text-secondary)' }">{{ error }}</p>
+              <button
+                @click="loadDashboardData"
+                class="mt-4 px-4 py-2 rounded-lg text-white text-sm font-medium transition-opacity duration-200 cursor-pointer min-h-[44px]"
+                :style="{ backgroundColor: 'var(--accent-red)' }"
+                aria-label="Retry loading dashboard"
+              >
                 Retry
               </button>
             </div>
@@ -40,62 +42,58 @@
             <!-- Dashboard Content -->
             <template v-else>
               <!-- Stats -->
-                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <div class="rounded-xl p-5" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)'}">
+              <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div
+                  v-for="stat in statCards"
+                  :key="stat.label"
+                  class="rounded-xl p-5 border"
+                  :style="{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--card-border)' }"
+                >
                   <div class="flex items-center justify-between mb-2">
-                    <BookOpen class="w-5 h-5 text-blue-600" />
-                    <span class="text-2xl font-bold" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ dashboardStats.total_knowledge_sources || 0 }}</span>
+                    <div class="w-9 h-9 rounded-lg flex items-center justify-center" :style="{ backgroundColor: stat.iconBg }">
+                      <svg class="w-5 h-5" :style="{ color: stat.iconColor }" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" :d="stat.iconPath" />
+                      </svg>
+                    </div>
+                    <span class="text-2xl font-bold" :style="{ color: 'var(--text-primary)' }">{{ stat.value }}</span>
                   </div>
-                  <p class="text-sm" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Available Resources</p>
-                  <p class="text-green-600 text-xs mt-1">Knowledge Base</p>
-                </div>
-
-                <div class="rounded-xl p-5" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)'}">
-                  <div class="flex items-center justify-between mb-2">
-                    <CheckCircle class="w-5 h-5 text-green-600" />
-                    <span class="text-2xl font-bold" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ userStats.total_queries || 0 }}</span>
-                  </div>
-                  <p class="text-sm" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">My Queries</p>
-                  <p class="text-green-600 text-xs mt-1">All time</p>
-                </div>
-
-                <div class="rounded-xl p-5" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)'}">
-                  <div class="flex items-center justify-between mb-2">
-                    <FileText class="w-5 h-5 text-purple-600" />
-                    <span class="text-2xl font-bold" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ activeTasksCount || 0 }}</span>
-                  </div>
-                  <p class="text-sm" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Active Tasks</p>
-                  <p class="text-green-600 text-xs mt-1">In Progress</p>
-                </div>
-
-                <div class="rounded-xl p-5" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)'}">
-                  <div class="flex items-center justify-between mb-2">
-                    <Clock class="w-5 h-5 text-orange-600" />
-                    <span class="text-2xl font-bold" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ recentQueriesCount || 0 }}</span>
-                  </div>
-                  <p class="text-sm" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Recent Queries</p>
-                  <p class="text-green-600 text-xs mt-1">This week</p>
+                  <p class="text-sm" :style="{ color: 'var(--text-secondary)' }">{{ stat.label }}</p>
+                  <p class="text-xs mt-1" :style="{ color: stat.subColor }">{{ stat.subLabel }}</p>
                 </div>
               </div>
 
               <!-- Two-column area -->
               <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <!-- Recent Queries -->
-                <div class="rounded-xl p-6" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)'}">
-                  <h3 class="text-lg font-semibold mb-4" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">My Recent Queries</h3>
-                  <div v-if="recentQueries.length === 0" class="text-center py-8" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
-                    <AlertCircle class="w-12 h-12 mx-auto mb-2 text-gray-400" />
-                    <p>No queries yet. Start asking questions!</p>
-                  </div>
+                <div class="rounded-xl p-6 border" :style="{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--card-border)' }">
+                  <h3 class="text-lg font-semibold mb-4" :style="{ color: 'var(--text-primary)' }">My Recent Queries</h3>
+                  <EmptyState
+                    v-if="recentQueries.length === 0"
+                    title="No queries yet"
+                    description="Start asking questions to see your history here."
+                  >
+                    <template #icon>
+                      <svg class="w-8 h-8" :style="{ color: 'var(--text-muted)' }" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                    </template>
+                  </EmptyState>
                   <div v-else class="space-y-3">
-                    <div v-for="q in recentQueries" :key="q.title" class="flex items-start p-3 bg-gray-50 rounded-lg">
-                      <AlertCircle class="w-5 h-5 text-orange-600 mr-3 mt-1" />
-                      <div class="flex-1">
-                        <p class="font-medium" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ q.title }}</p>
-                        <p class="text-sm" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ q.status }}</p>
-                        <p class="text-xs mt-1" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ formatDate(q.created_at) }}</p>
+                    <div
+                      v-for="q in recentQueries"
+                      :key="q.title"
+                      class="flex items-start p-3 rounded-lg border"
+                      :style="{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-light)' }"
+                    >
+                      <svg class="w-5 h-5 mr-3 mt-1 flex-shrink-0" :style="{ color: 'var(--accent-yellow)' }" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <div class="flex-1 min-w-0">
+                        <p class="font-medium" :style="{ color: 'var(--text-primary)' }">{{ q.title }}</p>
+                        <p class="text-sm" :style="{ color: 'var(--text-secondary)' }">{{ q.status }}</p>
+                        <p class="text-xs mt-1" :style="{ color: 'var(--text-tertiary)' }">{{ formatDate(q.created_at) }}</p>
                       </div>
-                      <span class="px-2 py-1 rounded text-xs" :class="getStatusClass(q.status)">
+                      <span class="px-2 py-1 rounded text-xs flex-shrink-0" :class="getStatusClass(q.status)">
                         {{ q.status }}
                       </span>
                     </div>
@@ -103,19 +101,33 @@
                 </div>
 
                 <!-- Top Knowledge Sources -->
-                <div class="rounded-xl p-6" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)'}">
-                  <h3 class="text-lg font-semibold mb-4" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Popular Resources</h3>
-                  <div v-if="topSources.length === 0" class="text-center py-8" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
-                    <BookOpen class="w-12 h-12 mx-auto mb-2 text-gray-400" />
-                    <p>No resources available yet.</p>
-                  </div>
+                <div class="rounded-xl p-6 border" :style="{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--card-border)' }">
+                  <h3 class="text-lg font-semibold mb-4" :style="{ color: 'var(--text-primary)' }">Popular Resources</h3>
+                  <EmptyState
+                    v-if="topSources.length === 0"
+                    title="No resources available"
+                    description="Resources will appear here once added to the knowledge base."
+                  >
+                    <template #icon>
+                      <svg class="w-8 h-8" :style="{ color: 'var(--text-muted)' }" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                      </svg>
+                    </template>
+                  </EmptyState>
                   <div v-else class="space-y-3">
-                    <div v-for="source in topSources" :key="source.id" class="flex items-start p-3 bg-gray-50 rounded-lg">
-                      <Bell class="w-5 h-5 text-blue-600 mr-3 mt-1" />
-                      <div class="flex-1">
-                        <p class="font-medium" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ source.title }}</p>
-                        <p class="text-sm" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ source.category }}</p>
-                        <p class="text-xs mt-1" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ source.views || 0 }} views</p>
+                    <div
+                      v-for="source in topSources"
+                      :key="source.id"
+                      class="flex items-start p-3 rounded-lg border"
+                      :style="{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-light)' }"
+                    >
+                      <svg class="w-5 h-5 mr-3 mt-1 flex-shrink-0" :style="{ color: 'var(--accent-blue)' }" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <div class="flex-1 min-w-0">
+                        <p class="font-medium" :style="{ color: 'var(--text-primary)' }">{{ source.title }}</p>
+                        <p class="text-sm" :style="{ color: 'var(--text-secondary)' }">{{ source.category }}</p>
+                        <p class="text-xs mt-1" :style="{ color: 'var(--text-tertiary)' }">{{ source.views || 0 }} views</p>
                       </div>
                     </div>
                   </div>
@@ -123,29 +135,35 @@
               </div>
 
               <!-- Knowledge Sources by Category -->
-              <div class="rounded-xl p-6" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)'}">
-                <h3 class="text-lg font-semibold mb-4" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Resources by Category</h3>
-                <div v-if="sourcesByCategory.length === 0" class="text-center py-8" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
-                  <p>Loading categories...</p>
+              <div class="rounded-xl p-6 border" :style="{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--card-border)' }">
+                <h3 class="text-lg font-semibold mb-4" :style="{ color: 'var(--text-primary)' }">Resources by Category</h3>
+                <div v-if="sourcesByCategory.length === 0" class="text-center py-8">
+                  <LoadingSpinner size="sm" text="Loading categories..." />
                 </div>
                 <div v-else class="space-y-4">
                   <div v-for="cat in sourcesByCategory" :key="cat.category">
                     <div class="flex items-center justify-between mb-2">
                       <div>
-                        <p class="font-medium" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ cat.category }}</p>
-                        <p class="text-sm" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ cat.count }} resources</p>
+                        <p class="font-medium" :style="{ color: 'var(--text-primary)' }">{{ cat.category }}</p>
+                        <p class="text-sm" :style="{ color: 'var(--text-tertiary)' }">{{ cat.count }} resources</p>
                       </div>
                       <button
                         @click="viewCategory(cat.category)"
-                        class="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                        class="text-sm font-medium transition-colors duration-200 cursor-pointer min-h-[44px] px-3 flex items-center"
+                        :style="{ color: 'var(--accent-blue)' }"
+                        @mouseenter="$event.target.style.opacity = '0.8'"
+                        @mouseleave="$event.target.style.opacity = '1'"
                       >
-                        View All →
+                        View All
+                        <svg class="w-4 h-4 ml-1" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                        </svg>
                       </button>
                     </div>
-                    <div class="w-full bg-gray-200 rounded-full h-2">
+                    <div class="w-full rounded-full h-2" :style="{ backgroundColor: 'var(--bg-tertiary)' }">
                       <div
-                        class="bg-blue-600 h-2 rounded-full"
-                        :style="{ width: getCategoryPercentage(cat.count) + '%' }"
+                        class="h-2 rounded-full transition-all duration-500"
+                        :style="{ width: getCategoryPercentage(cat.count) + '%', backgroundColor: 'var(--accent-blue)' }"
                       ></div>
                     </div>
                   </div>
@@ -156,32 +174,36 @@
 
           <!-- AI ASSISTANT PAGE -->
           <section v-show="activePage === 'ai-assistant'" class="h-full flex flex-col gap-4">
-            <div class="rounded-xl p-4" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)'}">
-              <h3 class="font-semibold" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Enhanced AI Assistant with Knowledge Base</h3>
-              <p class="text-sm" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Ask questions and get answers from our knowledge base and AI.</p>
-              <label class="inline-flex items-center mt-2">
+            <div class="rounded-xl p-4 border" :style="{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--card-border)' }">
+              <h3 class="font-semibold" :style="{ color: 'var(--text-primary)' }">Enhanced AI Assistant with Knowledge Base</h3>
+              <p class="text-sm" :style="{ color: 'var(--text-secondary)' }">Ask questions and get answers from our knowledge base and AI.</p>
+              <label class="inline-flex items-center mt-2 cursor-pointer">
                 <input
                   type="checkbox"
                   v-model="useKnowledgeBase"
-                  class="form-checkbox h-4 w-4 text-blue-600"
+                  class="form-checkbox h-4 w-4 rounded"
+                  :style="{ accentColor: 'var(--accent-blue)' }"
                 />
-                <span class="ml-2 text-sm" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Use Knowledge Base (RAG)</span>
+                <span class="ml-2 text-sm" :style="{ color: 'var(--text-secondary)' }">Use Knowledge Base (RAG)</span>
               </label>
             </div>
 
-            <div class="flex-1 rounded-xl p-4 flex flex-col" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)'}">
+            <div class="flex-1 rounded-xl p-4 flex flex-col border" :style="{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--card-border)' }">
               <div id="chatMessages" class="flex-1 overflow-y-auto p-4 space-y-3">
                 <div v-for="(m, i) in messages" :key="i"
                   :class="m.from === 'user' ? 'flex justify-end' : 'flex justify-start'">
-                  <div :class="['max-w-xs lg:max-w-md px-4 py-3 rounded-lg', m.from === 'user' ? 'bg-blue-600 text-white' : 'text-primary']"
-                    :style="m.from !== 'user' ? { backgroundColor: 'var(--color-bg-card)' } : {}">
+                  <div
+                    :class="['max-w-xs lg:max-w-md px-4 py-3 rounded-lg', m.from === 'user' ? 'text-white' : '']"
+                    :style="m.from === 'user'
+                      ? { backgroundColor: 'var(--accent-blue)', color: '#ffffff' }
+                      : { backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)' }"
+                  >
                     <p class="text-sm whitespace-pre-wrap">{{ m.text }}</p>
-                    <!-- Show sources if available -->
-                    <div v-if="m.sources && m.sources.length > 0" class="mt-2 pt-2 border-t border-gray-300">
-                      <p class="text-xs font-semibold mb-1">📚 Sources:</p>
-                      <ul class="text-xs space-y-1">
+                    <div v-if="m.sources && m.sources.length > 0" class="mt-2 pt-2 border-t" :style="{ borderColor: 'var(--border-default)' }">
+                      <p class="text-xs font-semibold mb-1" :style="{ color: 'var(--text-secondary)' }">Sources:</p>
+                      <ul class="text-xs space-y-1" :style="{ color: 'var(--text-tertiary)' }">
                         <li v-for="source in m.sources" :key="source.title">
-                          • {{ source.title }} ({{ source.category }})
+                          {{ source.title }} ({{ source.category }})
                         </li>
                       </ul>
                     </div>
@@ -190,29 +212,35 @@
 
                 <!-- Typing indicator -->
                 <div v-if="isTyping" class="flex justify-start">
-                  <div class="bg-gray-100 px-4 py-3 rounded-lg">
+                  <div class="px-4 py-3 rounded-lg" :style="{ backgroundColor: 'var(--bg-secondary)' }">
                     <div class="flex space-x-2">
-                      <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce"></div>
-                      <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.2s"></div>
-                      <div class="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style="animation-delay: 0.4s"></div>
+                      <div class="w-2 h-2 rounded-full animate-bounce" :style="{ backgroundColor: 'var(--text-muted)' }"></div>
+                      <div class="w-2 h-2 rounded-full animate-bounce" :style="{ backgroundColor: 'var(--text-muted)', animationDelay: '0.2s' }"></div>
+                      <div class="w-2 h-2 rounded-full animate-bounce" :style="{ backgroundColor: 'var(--text-muted)', animationDelay: '0.4s' }"></div>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div class="p-4 border-t border-gray-200">
+              <div class="p-4 border-t" :style="{ borderColor: 'var(--border-default)' }">
                 <div class="flex gap-2">
                   <input
                     v-model="chatInput"
                     @keyup.enter="sendMessage"
                     :disabled="isTyping"
                     placeholder="Ask a question..."
-                    class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 disabled:bg-gray-100"
+                    class="flex-1 px-4 py-2 rounded-lg border transition-colors duration-200 min-h-[44px]"
+                    :style="{
+                      backgroundColor: 'var(--input-bg)',
+                      borderColor: 'var(--input-border)',
+                      color: 'var(--input-text)'
+                    }"
                   />
                   <button
                     @click="sendMessage"
                     :disabled="isTyping || !chatInput.trim()"
-                    class="px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    class="px-5 py-2 rounded-lg text-white text-sm font-medium transition-opacity duration-200 cursor-pointer min-h-[44px] disabled:opacity-50 disabled:cursor-not-allowed"
+                    :style="{ backgroundColor: 'var(--accent-blue)' }"
                   >
                     {{ isTyping ? 'Sending...' : 'Send' }}
                   </button>
@@ -223,8 +251,8 @@
 
           <!-- KNOWLEDGE BASE PAGE -->
           <section v-show="activePage === 'knowledge-base'" class="space-y-6">
-            <div class="rounded-xl p-6" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)'}">
-              <h3 class="text-lg font-semibold mb-4" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Knowledge Base</h3>
+            <div class="rounded-xl p-6 border" :style="{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--card-border)' }">
+              <h3 class="text-lg font-semibold mb-4" :style="{ color: 'var(--text-primary)' }">Knowledge Base</h3>
 
               <!-- Search and Filter -->
               <div class="flex gap-4 mb-4">
@@ -232,12 +260,22 @@
                   v-model="knowledgeSearch"
                   @input="searchKnowledge"
                   placeholder="Search resources..."
-                  class="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  class="flex-1 px-4 py-2 rounded-lg border transition-colors duration-200 min-h-[44px]"
+                  :style="{
+                    backgroundColor: 'var(--input-bg)',
+                    borderColor: 'var(--input-border)',
+                    color: 'var(--input-text)'
+                  }"
                 />
                 <select
                   v-model="selectedCategory"
                   @change="filterByCategory"
-                  class="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  class="px-4 py-2 rounded-lg border transition-colors duration-200 min-h-[44px]"
+                  :style="{
+                    backgroundColor: 'var(--input-bg)',
+                    borderColor: 'var(--input-border)',
+                    color: 'var(--input-text)'
+                  }"
                 >
                   <option value="">All Categories</option>
                   <option v-for="cat in categories" :key="cat" :value="cat">{{ cat }}</option>
@@ -245,25 +283,39 @@
               </div>
 
               <!-- Knowledge Sources List -->
-              <div v-if="knowledgeSources.length === 0" class="text-center py-12" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
-                <BookOpen class="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                <p>No resources found.</p>
-              </div>
+              <EmptyState
+                v-if="knowledgeSources.length === 0"
+                title="No resources found"
+                description="Try adjusting your search or filter criteria."
+              >
+                <template #icon>
+                  <svg class="w-8 h-8" :style="{ color: 'var(--text-muted)' }" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </template>
+              </EmptyState>
               <div v-else class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div
                   v-for="source in knowledgeSources"
                   :key="source.id"
-                  class="bg-gray-50 border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow cursor-pointer"
+                  class="rounded-lg p-4 border transition-shadow duration-200 cursor-pointer"
+                  :style="{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-light)' }"
                   @click="viewSource(source)"
+                  @mouseenter="$event.currentTarget.style.boxShadow = '0 4px 12px var(--card-shadow)'"
+                  @mouseleave="$event.currentTarget.style.boxShadow = 'none'"
+                  tabindex="0"
+                  role="button"
+                  :aria-label="'View ' + source.title"
+                  @keyup.enter="viewSource(source)"
                 >
                   <div class="flex items-start justify-between mb-2">
-                    <h4 class="font-semibold text-sm" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ source.title }}</h4>
-                    <span class="text-xs px-2 py-1 bg-blue-100 text-blue-600 rounded">
+                    <h4 class="font-semibold text-sm" :style="{ color: 'var(--text-primary)' }">{{ source.title }}</h4>
+                    <span class="text-xs px-2 py-1 rounded flex-shrink-0 ml-2" :style="{ backgroundColor: 'var(--info-bg)', color: 'var(--info-text)' }">
                       {{ source.category }}
                     </span>
                   </div>
-                  <p class="text-sm line-clamp-2" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ source.description }}</p>
-                  <p class="text-xs mt-2" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ formatDate(source.created_at) }}</p>
+                  <p class="text-sm line-clamp-2" :style="{ color: 'var(--text-secondary)' }">{{ source.description }}</p>
+                  <p class="text-xs mt-2" :style="{ color: 'var(--text-tertiary)' }">{{ formatDate(source.created_at) }}</p>
                 </div>
               </div>
             </div>
@@ -271,10 +323,13 @@
 
           <!-- MY QUERIES PAGE -->
           <section v-show="activePage === 'my-queries'" class="space-y-6">
-            <div class="rounded-xl p-6" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)'}">
+            <div class="rounded-xl p-6 border" :style="{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--card-border)' }">
               <div class="flex items-center justify-between mb-4">
-                <h3 class="text-lg font-semibold" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">My Queries</h3>
-                <button class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                <h3 class="text-lg font-semibold" :style="{ color: 'var(--text-primary)' }">My Queries</h3>
+                <button
+                  class="px-4 py-2 rounded-lg text-white text-sm font-medium transition-opacity duration-200 cursor-pointer min-h-[44px]"
+                  :style="{ backgroundColor: 'var(--accent-blue)' }"
+                >
                   New Query
                 </button>
               </div>
@@ -283,51 +338,44 @@
                 <div
                   v-for="query in userStats.recent_queries"
                   :key="query.title"
-                  class="p-4 bg-gray-50 rounded-lg border border-gray-200"
+                  class="p-4 rounded-lg border"
+                  :style="{ backgroundColor: 'var(--bg-secondary)', borderColor: 'var(--border-light)' }"
                 >
                   <div class="flex items-start justify-between">
                     <div class="flex-1">
-                      <h4 class="font-semibold" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ query.title }}</h4>
-                      <p class="text-sm mt-1" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Status: {{ query.status }}</p>
-                      <p class="text-xs mt-1" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ formatDate(query.created_at) }}</p>
+                      <h4 class="font-semibold" :style="{ color: 'var(--text-primary)' }">{{ query.title }}</h4>
+                      <p class="text-sm mt-1" :style="{ color: 'var(--text-secondary)' }">Status: {{ query.status }}</p>
+                      <p class="text-xs mt-1" :style="{ color: 'var(--text-tertiary)' }">{{ formatDate(query.created_at) }}</p>
                     </div>
-                    <span class="px-3 py-1 rounded text-sm" :class="getStatusClass(query.status)">
+                    <span class="px-3 py-1 rounded text-sm flex-shrink-0" :class="getStatusClass(query.status)">
                       {{ query.status }}
                     </span>
                   </div>
                 </div>
               </div>
-              <div v-else class="text-center py-12" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">
-                <AlertCircle class="w-16 h-16 mx-auto mb-4 text-gray-300" />
-                <p>No queries yet. Create your first query!</p>
-              </div>
+              <EmptyState
+                v-else
+                title="No queries yet"
+                description="Create your first query to get started."
+                actionLabel="New Query"
+              >
+                <template #icon>
+                  <svg class="w-8 h-8" :style="{ color: 'var(--text-muted)' }" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </template>
+              </EmptyState>
             </div>
           </section>
 
           <!-- PROFILE PAGE -->
           <section v-show="activePage === 'profile'" class="space-y-6">
-            <div class="rounded-xl p-6" :style="{ backgroundColor: 'var(--color-bg-card)', borderColor: 'var(--color-border)'}">
-              <h3 class="text-lg font-semibold mb-4" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">My Profile</h3>
+            <div class="rounded-xl p-6 border" :style="{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--card-border)' }">
+              <h3 class="text-lg font-semibold mb-4" :style="{ color: 'var(--text-primary)' }">My Profile</h3>
               <div class="space-y-4">
-                <div>
-                  <label class="block text-sm font-medium mb-1" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Full Name</label>
-                  <p :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ userName }}</p>
-                </div>
-                <div>
-                  <label class="block text-sm font-medium mb-1" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Email</label>
-                  <p :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ userEmail }}</p>
-                </div>
-                <div>
-                  <label class="block text-sm font-medium mb-1" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Role</label>
-                  <p class="capitalize" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ userRole }}</p>
-                </div>
-                <div>
-                  <label class="block text-sm font-medium mb-1" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Total Queries</label>
-                  <p :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ userStats.total_queries || 0 }}</p>
-                </div>
-                <div>
-                  <label class="block text-sm font-medium mb-1" :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">Active Tasks</label>
-                  <p :style="{ color: themeStore.currentTheme === 'dark' ? 'white' : 'black' }">{{ userStats.active_tasks_count || 0 }}</p>
+                <div v-for="field in profileFields" :key="field.label">
+                  <label class="block text-sm font-medium mb-1" :style="{ color: 'var(--text-secondary)' }">{{ field.label }}</label>
+                  <p :style="{ color: 'var(--text-primary)' }">{{ field.value }}</p>
                 </div>
               </div>
             </div>
@@ -341,26 +389,14 @@
 <script setup>
 import Sidebar from '@/components/layout/StudentLayout/SideBar.vue'
 import HeaderBar from '@/components/layout/StudentLayout/HeaderBar.vue'
+import LoadingSpinner from '@/components/shared/LoadingSpinner.vue'
+import EmptyState from '@/components/shared/EmptyState.vue'
 import { ref, onMounted, computed } from 'vue'
-import {
-  Menu,
-  Bell,
-  LogOut,
-  BookOpen,
-  CheckCircle,
-  FileText,
-  Clock,
-  AlertCircle,
-} from 'lucide-vue-next'
-
-// Import API services
 import { dashboardAPI, knowledgeAPI, tasksAPI, chatbotAPI } from '@/api'
 import { useUserStore } from '@/stores/user'
 import { useThemeStore } from '@/stores/theme'
 
-// User store
 const themeStore = useThemeStore()
-// User store
 const userStore = useUserStore()
 const userName = computed(() => userStore.user?.full_name || 'Student')
 const userEmail = computed(() => userStore.user?.email || '')
@@ -389,14 +425,62 @@ const categories = ref([])
 
 // Chatbot
 const messages = ref([
-  { from: 'bot', text: "Hello! I'm your AI Assistant powered by our knowledge base. How can I help you today?" },
+  { from: 'bot', text: "Hello! I am your AI Assistant powered by our knowledge base. How can I help you today?" },
 ])
 const chatInput = ref('')
 const isTyping = ref(false)
 const useKnowledgeBase = ref(true)
 const conversationId = ref(null)
 
-// Computed
+// Computed stat cards for cleaner template
+const statCards = computed(() => [
+  {
+    label: 'Available Resources',
+    value: dashboardStats.value.total_knowledge_sources || 0,
+    subLabel: 'Knowledge Base',
+    subColor: 'var(--accent-green)',
+    iconPath: 'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
+    iconBg: 'var(--info-bg)',
+    iconColor: 'var(--accent-blue)'
+  },
+  {
+    label: 'My Queries',
+    value: userStats.value.total_queries || 0,
+    subLabel: 'All time',
+    subColor: 'var(--accent-green)',
+    iconPath: 'M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z',
+    iconBg: 'var(--success-bg)',
+    iconColor: 'var(--accent-green)'
+  },
+  {
+    label: 'Active Tasks',
+    value: activeTasksCount.value || 0,
+    subLabel: 'In Progress',
+    subColor: 'var(--accent-green)',
+    iconPath: 'M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z',
+    iconBg: 'var(--warning-bg)',
+    iconColor: 'var(--accent-purple)'
+  },
+  {
+    label: 'Recent Queries',
+    value: recentQueriesCount.value || 0,
+    subLabel: 'This week',
+    subColor: 'var(--accent-green)',
+    iconPath: 'M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z',
+    iconBg: 'var(--warning-bg)',
+    iconColor: 'var(--accent-yellow)'
+  }
+])
+
+// Profile fields for cleaner template
+const profileFields = computed(() => [
+  { label: 'Full Name', value: userName.value },
+  { label: 'Email', value: userEmail.value },
+  { label: 'Role', value: userRole.value },
+  { label: 'Total Queries', value: userStats.value.total_queries || 0 },
+  { label: 'Active Tasks', value: userStats.value.active_tasks_count || 0 }
+])
+
 const getCategoryPercentage = (count) => {
   const total = dashboardStats.value.total_knowledge_sources || 1
   return Math.round((count / total) * 100)
@@ -404,12 +488,12 @@ const getCategoryPercentage = (count) => {
 
 const getStatusClass = (status) => {
   const statusMap = {
-    'OPEN': 'bg-yellow-100 text-yellow-700',
-    'IN_PROGRESS': 'bg-blue-100 text-blue-700',
-    'RESOLVED': 'bg-green-100 text-green-700',
-    'CLOSED': 'bg-gray-100 text-gray-700',
+    'OPEN': 'status-open',
+    'IN_PROGRESS': 'status-in-progress',
+    'RESOLVED': 'status-resolved',
+    'CLOSED': 'status-closed',
   }
-  return statusMap[status] || 'bg-gray-100 text-gray-700'
+  return statusMap[status] || 'status-closed'
 }
 
 const formatDate = (dateString) => {
@@ -418,7 +502,6 @@ const formatDate = (dateString) => {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-// Functions
 const showPage = (id) => {
   activePage.value = id
   const titleMap = {
@@ -431,7 +514,6 @@ const showPage = (id) => {
   }
   pageTitle.value = titleMap[id] || 'Aura'
 
-  // Load data for specific pages
   if (id === 'knowledge-base' && knowledgeSources.value.length === 0) {
     loadKnowledgeSources()
   }
@@ -442,25 +524,20 @@ const loadDashboardData = async () => {
   error.value = null
 
   try {
-    // Load dashboard statistics
     const stats = await dashboardAPI.getStatistics()
     dashboardStats.value = stats
 
-    // Load top sources
     const topSourcesData = await dashboardAPI.getTopSources({ limit: 5 })
     topSources.value = topSourcesData.sources || []
 
-    // Load user context
     const context = await chatbotAPI.getUserContext()
     userStats.value = context.user_context || {}
     recentQueries.value = userStats.value.recent_queries || []
     recentQueriesCount.value = recentQueries.value.length
 
-    // Load task statistics
     const taskStats = await tasksAPI.getStatistics()
     activeTasksCount.value = taskStats.in_progress_count || 0
 
-    // Load categories
     if (stats.sources_by_category) {
       sourcesByCategory.value = Object.entries(stats.sources_by_category).map(([category, count]) => ({
         category,
@@ -468,7 +545,6 @@ const loadDashboardData = async () => {
       }))
     }
 
-    // Load available categories
     const categoriesData = await knowledgeAPI.getCategories()
     categories.value = categoriesData.categories || []
 
@@ -482,15 +558,9 @@ const loadDashboardData = async () => {
 
 const loadKnowledgeSources = async () => {
   try {
-    const params = {
-      limit: 50
-    }
-    if (knowledgeSearch.value) {
-      params.search = knowledgeSearch.value
-    }
-    if (selectedCategory.value) {
-      params.category = selectedCategory.value
-    }
+    const params = { limit: 50 }
+    if (knowledgeSearch.value) params.search = knowledgeSearch.value
+    if (selectedCategory.value) params.category = selectedCategory.value
 
     const data = await knowledgeAPI.getSources(params)
     knowledgeSources.value = data.sources || []
@@ -499,13 +569,8 @@ const loadKnowledgeSources = async () => {
   }
 }
 
-const searchKnowledge = () => {
-  loadKnowledgeSources()
-}
-
-const filterByCategory = () => {
-  loadKnowledgeSources()
-}
+const searchKnowledge = () => loadKnowledgeSources()
+const filterByCategory = () => loadKnowledgeSources()
 
 const viewCategory = (category) => {
   selectedCategory.value = category
@@ -521,13 +586,11 @@ const sendMessage = async () => {
   const text = chatInput.value.trim()
   if (!text || isTyping.value) return
 
-  // Add user message
   messages.value.push({ from: 'user', text })
   chatInput.value = ''
   isTyping.value = true
 
   try {
-    // Always use enhanced chat with query detection
     const response = await chatbotAPI.sendEnhancedChatMessage({
       message: text,
       conversation_id: conversationId.value,
@@ -537,7 +600,6 @@ const sendMessage = async () => {
 
     conversationId.value = response.conversation_id
 
-    // Add bot message with sources
     messages.value.push({
       from: 'bot',
       text: response.answer,
@@ -551,18 +613,13 @@ const sendMessage = async () => {
     })
   } finally {
     isTyping.value = false
-
-    // Scroll to bottom
     setTimeout(() => {
       const chatDiv = document.getElementById('chatMessages')
-      if (chatDiv) {
-        chatDiv.scrollTop = chatDiv.scrollHeight
-      }
+      if (chatDiv) chatDiv.scrollTop = chatDiv.scrollHeight
     }, 100)
   }
 }
 
-// Lifecycle
 onMounted(() => {
   loadDashboardData()
 })
@@ -574,5 +631,31 @@ onMounted(() => {
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
   overflow: hidden;
+}
+
+/* Status badge styles using theme variables */
+.status-open {
+  background-color: var(--warning-bg);
+  color: var(--warning-text);
+}
+.status-in-progress {
+  background-color: var(--info-bg);
+  color: var(--info-text);
+}
+.status-resolved {
+  background-color: var(--success-bg);
+  color: var(--success-text);
+}
+.status-closed {
+  background-color: var(--bg-tertiary);
+  color: var(--text-tertiary);
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-4px); }
+}
+.animate-bounce {
+  animation: bounce 1s infinite;
 }
 </style>

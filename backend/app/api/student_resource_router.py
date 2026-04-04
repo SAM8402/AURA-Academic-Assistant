@@ -125,7 +125,7 @@ async def upload_document(
     
     # Validate file type
     allowed_extensions = [".pdf", ".doc", ".docx", ".txt"]
-    file_ext = os.path.splitext(file.filename)[1].lower()
+    file_ext = os.path.splitext(file.filename or 'file')[1].lower()
     if file_ext not in allowed_extensions:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -202,7 +202,7 @@ async def upload_image(
     
     # Validate file type
     allowed_extensions = [".jpg", ".jpeg", ".png", ".gif", ".webp"]
-    file_ext = os.path.splitext(file.filename)[1].lower()
+    file_ext = os.path.splitext(file.filename or 'file')[1].lower()
     if file_ext not in allowed_extensions:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
