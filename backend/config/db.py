@@ -7,7 +7,7 @@ and provides database dependencies for FastAPI routes.
 
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
-from app.core.config import settings
+from config.settings import settings
 
 
 # ============================================================================
@@ -94,7 +94,7 @@ def init_db():
         for better version control and schema management.
 
     Example:
-        from app.core.db import init_db
+        from config.db import init_db
         init_db()  # Creates all tables
     """
     # Import all models here to ensure they are registered with Base
@@ -119,7 +119,7 @@ def drop_db():
     Use only for development/testing purposes.
 
     Example:
-        from app.core.db import drop_db
+        from config.db import drop_db
         drop_db()  # Drops all tables
     """
     Base.metadata.drop_all(bind=engine)

@@ -13,7 +13,7 @@ from typing import Optional, List
 from collections import defaultdict
 import re
 
-from app.core.db import get_db
+from config.db import get_db
 from app.models.user import User
 from app.schemas.user_schema import UserRole
 from app.models.query import Query as QueryModel, QueryResponse

@@ -13,8 +13,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from jose import JWTError
 
-from app.core.db import get_db
-from app.core.security import create_tokens, decode_token
+from config.db import get_db
+from config.security import create_tokens, decode_token
 from app.models.user import User
 from app.models.profile import Profile
 from app.models.course import Course

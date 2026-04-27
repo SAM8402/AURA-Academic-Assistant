@@ -6,7 +6,7 @@ This module defines the Resource model for educational materials.
 
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, Enum as SQLEnum, func, JSON
 from sqlalchemy.orm import relationship
-from app.core.db import Base
+from config.db import Base
 from app.schemas.resource_schema import ResourceType, ResourceVisibility
 
 

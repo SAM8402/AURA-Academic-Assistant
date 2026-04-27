@@ -12,7 +12,7 @@ from sqlalchemy import Column, String, DateTime, Enum, UniqueConstraint, Index, 
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
-from app.core.db import Base
+from config.db import Base
 from app.models.types import GUID
 from app.models.enums import CallStatusEnum
 

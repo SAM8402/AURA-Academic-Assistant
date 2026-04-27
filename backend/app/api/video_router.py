@@ -1,6 +1,6 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from app.services.video_summary_service import video_summary_service
+from app.services.video.summary_service import video_summary_service
 
 router = APIRouter()
 

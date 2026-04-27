@@ -6,8 +6,8 @@ This module defines the User SQLAlchemy model for database operations.
 
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, Enum as SQLEnum, func
 from sqlalchemy.orm import relationship
-from app.core.db import Base
-from app.core.security import hash_password, verify_password
+from config.db import Base
+from config.security import hash_password, verify_password
 from app.schemas.user_schema import UserRole
 import enum
 

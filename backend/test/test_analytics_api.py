@@ -19,7 +19,7 @@ from app.models.query import Query, QueryResponse
 from app.models.knowledge import KnowledgeSource
 from app.models.chat_session import ChatSession
 from app.schemas.query_schema import QueryStatus, QueryCategory, QueryPriority
-from app.core.security import hash_password
+from config.security import hash_password
 
 
 @pytest.mark.api

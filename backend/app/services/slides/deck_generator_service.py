@@ -24,10 +24,10 @@ except ImportError:
     JsonOutputParser = None
     PromptTemplate = None
 
-from app.core.config import settings
-from app.services.chart_generator import chart_generator
-from app.services.content_optimizer import content_optimizer
-from app.services.graph_validator import graph_validator
+from config.settings import settings
+from app.services.slides.chart_generator import chart_generator
+from app.services.slides.content_optimizer import content_optimizer
+from app.services.slides.graph_validator import graph_validator
 
 logger = logging.getLogger(__name__)
 

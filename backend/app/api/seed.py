@@ -9,9 +9,9 @@ from sqlalchemy.orm import Session
 from datetime import datetime, UTC, timedelta
 import random
 
-from app.core.db import get_db
+from config.db import get_db
 from app.api.dependencies import get_current_user
-from app.core.security import is_admin
+from config.security import is_admin
 from app.models.user import User
 from app.models.knowledge import KnowledgeSource, KnowledgeChunk
 from app.models.task import Task
@@ -23,7 +23,7 @@ from app.models.enums import (
 )
 from app.schemas.user_schema import UserRole
 from app.schemas.query_schema import QueryStatus, QueryCategory, QueryPriority
-from app.core.security import hash_password
+from config.security import hash_password
 
 
 router = APIRouter(prefix="/seed", tags=["Seed Data"])

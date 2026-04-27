@@ -4,7 +4,7 @@ from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
-from app.core.db import Base
+from config.db import Base
 
 
 class DoubtUpload(Base):

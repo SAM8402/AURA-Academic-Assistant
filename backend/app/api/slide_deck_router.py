@@ -7,7 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
-from app.core.db import get_db
+from config.db import get_db
 from app.models.user import User
 from app.models.course import Course
 from app.models.slide_deck import SlideDeck
@@ -15,9 +15,9 @@ from app.schemas.slide_deck_schema import (
     SlideDeckGenerationRequest, SlideDeckUpdateRequest, SlideDeckResponse, SlideDeckPreview
 )
 from app.api.dependencies import require_ta, require_authenticated
-from app.services.slide_deck_service import slide_deck_service
-from app.services.pptx_export_service import export_to_pptx
-from app.services.pdf_export_service import export_to_pdf
+from app.services.slides.deck_generator_service import slide_deck_service
+from app.services.slides.pptx_export_service import export_to_pptx
+from app.services.slides.pdf_export_service import export_to_pdf
 
 router = APIRouter()
 

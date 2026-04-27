@@ -2,12 +2,13 @@
 Knowledge base models for AURA.
 
 This module defines models for storing knowledge sources and their vector embeddings
-for semantic search using pgvector.
+for semantic search. Supports both pgvector (PostgreSQL) and JSON-in-Text (SQLite)
+storage for embeddings, enabling RAG pipeline integration across database backends.
 """
 
 from sqlalchemy import Column, String, Boolean, DateTime, Integer, Text, ForeignKey, Index, Enum
 from sqlalchemy.orm import relationship
-from app.core.db import Base
+from config.db import Base
 from app.models.types import GUID
 from datetime import datetime
 import uuid
@@ -34,6 +35,7 @@ class KnowledgeSource(Base):
     title = Column(String, nullable=False, index=True)
     description = Column(Text)
     content = Column(Text, nullable=False)  # Main content to be embedded
+    file_path = Column(String, nullable=True)  # Path to source file in uploads/ (PDF, .md, .doc)
     category = Column(Enum(CategoryEnum), nullable=False)
     is_active = Column(Boolean, default=True, index=True)
     chunk_count = Column(Integer, default=0)

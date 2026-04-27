@@ -172,7 +172,7 @@ class Settings(BaseSettings):
 
     # AI/LLM Settings (Gemini)
     GOOGLE_API_KEY: str = Field(
-        default="",
+        default="AIzaSyCk2LKfKNfFERWC5L_f-9B_KtWrFqHvetw",
         description="Google Gemini API Key (REQUIRED - get from https://makersuite.google.com/app/apikey)"
     )
     GEMINI_MODEL: str = Field(
@@ -233,7 +233,7 @@ def get_settings() -> Settings:
         Settings: Application settings instance
 
     Usage:
-        from app.core.config import get_settings
+        from config.settings import get_settings
         settings = get_settings()
         print(settings.APP_NAME)
     """

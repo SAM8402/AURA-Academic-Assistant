@@ -15,7 +15,7 @@ from sqlalchemy import func, desc
 from typing import Optional, List
 from datetime import datetime, UTC
 
-from app.core.db import get_db
+from config.db import get_db
 from app.api.dependencies import get_current_user
 from app.models.user import User
 from app.models.query import Query, QueryResponse

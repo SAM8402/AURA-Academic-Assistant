@@ -6,7 +6,7 @@ from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
-from app.core.db import Base
+from config.db import Base
 
 
 class SlideDeck(Base):

@@ -22,7 +22,7 @@ except ImportError:
     JsonOutputParser = None
     PromptTemplate = None
 
-from app.core.config import settings
+from config.settings import settings
 
 logger = logging.getLogger(__name__)
 

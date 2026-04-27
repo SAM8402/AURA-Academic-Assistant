@@ -5,7 +5,7 @@ import sys
 import os
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from app.services.chart_generator import chart_generator
+from app.services.slides.chart_generator import chart_generator
 
 def test_chart_generation():
     print("Testing chart generation...")

@@ -6,7 +6,7 @@ This module defines the Profile model for extended user information.
 
 from sqlalchemy import Column, Integer, String, Text, Date, DateTime, ForeignKey, func, JSON
 from sqlalchemy.orm import relationship
-from app.core.db import Base
+from config.db import Base
 
 
 class Profile(Base):

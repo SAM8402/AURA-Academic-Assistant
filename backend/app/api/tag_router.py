@@ -6,7 +6,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
-from app.core.db import get_db
+from config.db import get_db
 from app.models.tag import Tag
 from app.models.user import User
 from app.schemas.tag_schema import TagCreate, TagUpdate, TagResponse

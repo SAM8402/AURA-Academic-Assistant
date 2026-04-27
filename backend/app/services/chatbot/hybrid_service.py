@@ -81,7 +81,7 @@ except ImportError:
     BaseAgent = None
     LlmRequest = None
 
-from app.core.config import settings
+from config.settings import settings
 from app.schemas.chatbot_schema import ChatMode
 
 # SQLAlchemy imports for database integration
@@ -827,7 +827,10 @@ Provide clear, educational explanations and help students learn effectively.""",
         limit: int = 5
     ) -> List[Dict[str, Any]]:
         """
-        Search knowledge base for relevant information.
+        Search knowledge base for relevant information using RAG semantic search.
+
+        Uses Gemini embeddings + cosine similarity for semantic matching,
+        with keyword search as fallback.
 
         Args:
             db: Database session
@@ -836,23 +839,65 @@ Provide clear, educational explanations and help students learn effectively.""",
             limit: Maximum number of results
 
         Returns:
-            List of relevant knowledge sources
+            List of relevant knowledge sources with similarity scores
         """
         if not SQLALCHEMY_AVAILABLE:
             logging.warning("SQLAlchemy not available for knowledge base search")
             return []
 
+        # Try RAG semantic search first
         try:
-            # Build query
+            from app.services.rag.search_pipeline import semantic_search_sqlite
+            from app.services.rag.embedding_service import generate_embedding
+
+            # Generate query embedding
+            query_embedding = generate_embedding(query)
+
+            if query_embedding:
+                # Build filters
+                filters = {}
+                if category:
+                    filters["category"] = category
+
+                # Run semantic search
+                results = semantic_search_sqlite(
+                    session=db,
+                    query_embedding=query_embedding,
+                    top_k=limit,
+                    filters=filters,
+                    similarity_threshold=0.3
+                )
+
+                if results:
+                    logging.info(
+                        "RAG semantic search found %d results for: '%s'",
+                        len(results), query[:50]
+                    )
+                    return [
+                        {
+                            "id": r.get("source_id", ""),
+                            "title": r.get("source_title", "Unknown"),
+                            "description": r.get("source_description", ""),
+                            "content": r.get("content", "")[:500] + "..." if len(r.get("content", "")) > 500 else r.get("content", ""),
+                            "category": r.get("source_category", "Unknown"),
+                            "relevance": f"semantic ({r.get('score', 0.0):.3f})",
+                            "score": r.get("score", 0.0)
+                        }
+                        for r in results
+                    ]
+
+        except Exception as e:
+            logging.warning("RAG semantic search failed, falling back to keyword: %s", e)
+
+        # Fallback to keyword search
+        try:
             db_query = db.query(KnowledgeSource).filter(
                 KnowledgeSource.is_active == True
             )
 
-            # Apply category filter
             if category:
                 db_query = db_query.filter(KnowledgeSource.category == category)
 
-            # Search in title, description, and content
             if query:
                 search_term = f"%{query}%"
                 from sqlalchemy import or_
@@ -864,7 +909,6 @@ Provide clear, educational explanations and help students learn effectively.""",
                     )
                 )
 
-            # Get results
             sources = db_query.limit(limit).all()
 
             return [
@@ -874,13 +918,13 @@ Provide clear, educational explanations and help students learn effectively.""",
                     "description": source.description,
                     "content": source.content[:500] + "..." if len(source.content) > 500 else source.content,
                     "category": source.category.value,
-                    "relevance": "high"  # TODO: Implement proper relevance scoring
+                    "relevance": "keyword"
                 }
                 for source in sources
             ]
 
         except Exception as e:
-            logging.error(f"Error searching knowledge base: {e}")
+            logging.error("Error searching knowledge base: %s", e)
             return []
 
     def get_relevant_chunks(

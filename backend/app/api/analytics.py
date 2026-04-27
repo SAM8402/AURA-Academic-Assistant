@@ -10,7 +10,7 @@ from sqlalchemy import func, desc, and_, case, extract
 from datetime import datetime, UTC, timedelta
 from typing import Optional
 
-from app.core.db import get_db
+from config.db import get_db
 from app.models.user import User
 from app.schemas.user_schema import UserRole
 from app.models.query import Query as QueryModel, QueryResponse

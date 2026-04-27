@@ -17,7 +17,7 @@ from datetime import datetime, timedelta, timezone
 import random
 import uuid
 
-from app.core.db import SessionLocal, engine, Base
+from config.db import SessionLocal, engine, Base
 from app.models.user import User
 from app.models.profile import Profile
 from app.models.course import Course
@@ -38,7 +38,7 @@ from app.schemas.user_schema import UserRole
 from app.schemas.query_schema import QueryStatus, QueryCategory, QueryPriority
 from app.schemas.announcement_schema import AnnouncementType, AnnouncementTarget
 from app.schemas.resource_schema import ResourceType, ResourceVisibility
-from app.core.security import hash_password
+from config.security import hash_password
 from datetime import date
 
 

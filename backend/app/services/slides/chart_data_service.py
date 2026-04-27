@@ -25,8 +25,9 @@ class ChartDataService:
             # Try to load from backend/config/sample_chart_data.json
             config_path = os.path.join(
                 os.path.dirname(__file__),
-                "..",
-                "..",
+                "..",   # → services/
+                "..",   # → app/
+                "..",   # → backend/
                 "config",
                 "sample_chart_data.json"
             )

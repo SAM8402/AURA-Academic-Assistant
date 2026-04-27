@@ -1,7 +1,7 @@
 import logging
 import re
 from urllib.parse import urlparse, parse_qs
-from app.core.config import settings
+from config.settings import settings
 
 # LangChain imports with fallback
 try:

@@ -6,7 +6,7 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.core.db import get_db
+from config.db import get_db
 from app.models.course import Course
 from app.models.user import User
 from app.schemas.course_schema import CourseCreate, CourseUpdate, CourseResponse

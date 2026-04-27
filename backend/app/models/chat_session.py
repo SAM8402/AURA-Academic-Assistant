@@ -13,7 +13,7 @@ from sqlalchemy import Column, String, DateTime, Index, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 
-from app.core.db import Base
+from config.db import Base
 from app.models.types import GUID
 
 

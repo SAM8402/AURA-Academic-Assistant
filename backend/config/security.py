@@ -9,7 +9,7 @@ from typing import Optional, Dict, Any
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
-from app.core.config import settings
+from config.settings import settings
 from app.schemas.user_schema import TokenData, UserRole
 
 # Password hashing context using Argon2

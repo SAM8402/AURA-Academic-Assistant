@@ -10,10 +10,10 @@ from sqlalchemy import func
 from typing import Optional
 from datetime import datetime, UTC, timedelta
 
-from app.core.db import get_db
+from config.db import get_db
 from app.api.dependencies import get_current_user
 from app.schemas.user_schema import UserRole
-from app.core.security import is_ta_or_above
+from config.security import is_ta_or_above
 from app.models.user import User
 from app.models.knowledge import KnowledgeSource
 from app.models.query import Query as QueryModel

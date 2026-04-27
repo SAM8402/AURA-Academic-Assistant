@@ -9,8 +9,8 @@ import json
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from app.services.slide_deck_service import slide_deck_service, GraphType
-from app.services.chart_generator import chart_generator
+from app.services.slides.deck_generator_service import slide_deck_service, GraphType
+from app.services.slides.chart_generator import chart_generator
 
 async def test_full_pipeline():
     """Test the complete slide generation pipeline with graphs."""

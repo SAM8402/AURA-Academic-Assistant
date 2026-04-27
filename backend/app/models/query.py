@@ -6,7 +6,7 @@ This module defines models for student queries, doubts, and their responses.
 
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, Enum as SQLEnum, func, JSON
 from sqlalchemy.orm import relationship
-from app.core.db import Base
+from config.db import Base
 from app.schemas.query_schema import QueryStatus, QueryPriority, QueryCategory
 
 

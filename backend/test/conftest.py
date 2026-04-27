@@ -25,7 +25,7 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from main import app
-from app.core.db import Base, get_db
+from config.db import Base, get_db
 
 # Import ALL models to register them with Base before create_all
 from app.models.user import User
@@ -43,7 +43,7 @@ from app.models.resource import Resource
 from app.models.tag import Tag
 from app.models.announcement import Announcement
 
-from app.core.security import create_tokens
+from config.security import create_tokens
 
 
 # ============================================================================

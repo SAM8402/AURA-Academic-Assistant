@@ -20,7 +20,7 @@ except ImportError:
     StrOutputParser = None
     PromptTemplate = None
 
-from app.core.config import settings
+from config.settings import settings
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)

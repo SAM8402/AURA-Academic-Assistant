@@ -2,16 +2,19 @@
 Knowledge Base API Endpoints for AURA.
 
 Provides CRUD operations for knowledge sources and semantic search capabilities.
-Note: Some features require PostgreSQL with pgvector extension.
+Includes RAG pipeline integration for automatic embedding generation and
+semantic search using Gemini Embedding API + cosine similarity.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+import logging
+import asyncio
+from fastapi import APIRouter, Depends, HTTPException, status, Query, BackgroundTasks, UploadFile, File
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from typing import Optional, List
 from uuid import UUID
 
-from app.core.db import get_db
+from config.db import get_db
 from app.api.dependencies import get_current_user
 from app.models.user import User
 from app.models.knowledge import KnowledgeSource, KnowledgeChunk
@@ -27,6 +30,12 @@ from app.schemas.knowledge_schema import (
     KnowledgeStats
 )
 
+# RAG Pipeline imports
+from app.services.rag.ingest_pipeline import process_knowledge_source
+from app.services.rag.search_pipeline import search as rag_search
+
+logger = logging.getLogger(__name__)
+
 
 router = APIRouter(prefix="/knowledge", tags=["Knowledge Base"])
 
@@ -38,6 +47,7 @@ router = APIRouter(prefix="/knowledge", tags=["Knowledge Base"])
 @router.post("/sources", response_model=KnowledgeSourceOut, status_code=status.HTTP_201_CREATED)
 async def create_knowledge_source(
     source: KnowledgeSourceCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
@@ -50,7 +60,8 @@ async def create_knowledge_source(
     - **category**: Category for organization (required)
     - **is_active**: Whether source is active for search (default: true)
 
-    Note: Automatic embedding generation requires background task setup.
+    Automatically triggers the RAG embedding pipeline to chunk and embed
+    the content for semantic search.
     """
     try:
         # Create knowledge source
@@ -66,8 +77,10 @@ async def create_knowledge_source(
         db.commit()
         db.refresh(db_source)
 
-        # TODO: Trigger embedding generation when Celery is configured
-        # process_document.delay(str(db_source.id))
+        # Trigger RAG embedding pipeline in background
+        source_id = str(db_source.id)
+        background_tasks.add_task(_run_embedding_pipeline, source_id)
+        logger.info("Triggered embedding pipeline for source: %s", source_id)
 
         return db_source
 
@@ -76,6 +89,92 @@ async def create_knowledge_source(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to create knowledge source: {str(e)}"
+        )
+
+
+@router.post("/sources/upload", response_model=KnowledgeSourceOut, status_code=status.HTTP_201_CREATED)
+async def upload_knowledge_file(
+    background_tasks: BackgroundTasks,
+    title: str = Query(..., description="Source title"),
+    category: str = Query(..., description="Category (e.g. courses, assignments)"),
+    description: Optional[str] = Query(None, description="Source description"),
+    file: UploadFile = File(..., description="PDF, .md, .doc, .docx, or .txt file"),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Upload a file (PDF, .md, .doc, .docx, .txt) as a knowledge source.
+
+    The file is saved to uploads/knowledge/ and the RAG pipeline extracts
+    text content, chunks it into sentences, and generates embeddings.
+
+    Supported formats: .pdf, .md, .txt, .doc, .docx
+    """
+    import os
+    import shutil
+
+    ext = os.path.splitext(file.filename)[1].lower()
+    supported = {".pdf", ".md", ".txt", ".doc", ".docx"}
+    if ext not in supported:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unsupported file type: {ext}. Supported: {', '.join(supported)}"
+        )
+
+    try:
+        # Save file to uploads/knowledge/
+        upload_dir = os.path.join("uploads", "knowledge")
+        os.makedirs(upload_dir, exist_ok=True)
+
+        # Use a unique filename to avoid collisions
+        import uuid as _uuid
+        safe_name = f"{_uuid.uuid4().hex[:8]}_{file.filename}"
+        file_path = os.path.join(upload_dir, safe_name)
+
+        with open(file_path, "wb") as f:
+            shutil.copyfileobj(file.file, f)
+
+        abs_file_path = os.path.abspath(file_path)
+        logger.info("Saved uploaded file: %s", abs_file_path)
+
+        # Validate category
+        try:
+            cat_enum = CategoryEnum(category)
+        except ValueError:
+            valid = [c.value for c in CategoryEnum]
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid category: {category}. Valid: {valid}"
+            )
+
+        # Create knowledge source with file_path (content will be extracted by pipeline)
+        db_source = KnowledgeSource(
+            title=title,
+            description=description or f"Uploaded from {file.filename}",
+            content="[Pending file extraction]",  # Placeholder — pipeline will fill this
+            file_path=abs_file_path,
+            category=cat_enum,
+            is_active=True
+        )
+
+        db.add(db_source)
+        db.commit()
+        db.refresh(db_source)
+
+        # Trigger RAG pipeline (will extract text from file, chunk, embed)
+        source_id = str(db_source.id)
+        background_tasks.add_task(_run_embedding_pipeline, source_id)
+        logger.info("Triggered file-based embedding pipeline for: %s → %s", file.filename, source_id)
+
+        return db_source
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to upload knowledge file: {str(e)}"
         )
 
 
@@ -310,16 +409,72 @@ async def semantic_search(
     current_user: User = Depends(get_current_user)
 ):
     """
-    Perform semantic search across knowledge base.
+    Perform semantic search across knowledge base using RAG pipeline.
 
-    Note: This requires PostgreSQL with pgvector extension and embeddings to be generated.
-    Currently returns a placeholder message.
+    Uses Gemini embeddings + cosine similarity for semantic matching.
+    Returns ranked results with similarity scores.
     """
+    try:
+        # Build filters
+        filters = {}
+        if search_request.category:
+            filters["category"] = search_request.category
+
+        # Run RAG search pipeline
+        result = await rag_search(
+            query=search_request.query,
+            top_k=search_request.top_k,
+            filters=filters
+        )
+
+        return {
+            "query": search_request.query,
+            "results": result.get("results", []),
+            "total_results": result.get("total_results", 0),
+            "used_cache": result.get("used_cache", False),
+            "metadata": result.get("metadata", {}),
+            "status": "success" if result.get("success") else "failed",
+            "error": result.get("error")
+        }
+
+    except Exception as e:
+        logger.error("Semantic search failed: %s", str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Semantic search failed: {str(e)}"
+        )
+
+
+@router.post("/sources/{source_id}/embed")
+async def embed_knowledge_source(
+    source_id: UUID,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """
+    Manually trigger embedding generation for a knowledge source.
+
+    Use this to re-embed a source after content updates or if
+    initial embedding failed.
+    """
+    source = db.query(KnowledgeSource).filter(
+        KnowledgeSource.id == source_id
+    ).first()
+
+    if not source:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Knowledge source not found"
+        )
+
+    # Trigger embedding pipeline in background
+    background_tasks.add_task(_run_embedding_pipeline, str(source_id))
+
     return {
-        "message": "Semantic search requires PostgreSQL with pgvector extension",
-        "query": search_request.query,
-        "status": "not_configured",
-        "note": "Use text search via /knowledge/sources?search=query for now"
+        "message": "Embedding pipeline triggered",
+        "source_id": str(source_id),
+        "status": "processing"
     }
 
 
@@ -364,3 +519,36 @@ async def get_knowledge_stats(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to retrieve knowledge statistics: {str(e)}"
         )
+
+
+# ============================================================================
+# BACKGROUND TASK HELPERS
+# ============================================================================
+
+def _run_embedding_pipeline(source_id: str):
+    """
+    Run the RAG embedding pipeline in a background task.
+
+    Bridges sync BackgroundTasks context with async pipeline.
+    """
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(process_knowledge_source(source_id))
+        loop.close()
+
+        if result.get("success"):
+            logger.info(
+                "Embedding pipeline completed for source %s: %d chunks, %d embeddings",
+                source_id,
+                result.get("chunks_created", 0),
+                result.get("embeddings_generated", 0)
+            )
+        else:
+            logger.error(
+                "Embedding pipeline failed for source %s: %s",
+                source_id, result.get("error")
+            )
+
+    except Exception as e:
+        logger.error("Background embedding pipeline error for source %s: %s", source_id, e)

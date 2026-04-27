@@ -6,7 +6,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 
-from app.core.db import get_db
+from config.db import get_db
 from app.models.user import User
 from app.models.course import Course
 from app.models.quiz import Quiz
@@ -16,8 +16,8 @@ from app.schemas.quiz_schema import (
     QuizAttemptRequest, QuizAttemptResponse
 )
 from app.api.dependencies import require_ta, require_authenticated
-from app.services.quiz_service import quiz_service
-from app.services.quiz_db_service import quiz_db_service
+from app.services.quiz.generator_service import quiz_service
+from app.services.quiz.db_service import quiz_db_service
 
 router = APIRouter()
 

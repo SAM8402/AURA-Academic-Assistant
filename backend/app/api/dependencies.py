@@ -14,8 +14,8 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError
 from sqlalchemy.orm import Session
 
-from app.core.db import get_db
-from app.core.security import decode_token
+from config.db import get_db
+from config.security import decode_token
 from app.models.user import User
 from app.schemas.user_schema import UserRole, TokenData
 

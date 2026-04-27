@@ -9,7 +9,7 @@ Covers:
 
 import pytest
 from unittest.mock import patch, AsyncMock
-from app.services.doubt_summarizer_service import doubt_summarizer_service
+from app.services.doubts.summarizer_service import doubt_summarizer_service
 
 # Mock Data returned by LLM
 MOCK_LLM_RESPONSE = {

@@ -20,7 +20,7 @@ except ImportError:
     plt = None
     np = None
 
-from app.services.chart_data_service import chart_data_service
+from app.services.slides.chart_data_service import chart_data_service
 
 logger = logging.getLogger(__name__)
 

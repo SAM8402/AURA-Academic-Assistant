@@ -15,7 +15,7 @@ from typing import Dict, Any
 import sys
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from app.services.quiz_service import QuizService
+from app.services.quiz.generator_service import QuizService
 
 # --- Test Configuration ---
 

@@ -7,12 +7,12 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
-from app.core.db import get_db
+from config.db import get_db
 from app.models.user import User
 from app.models.chat_session import ChatSession
 from app.schemas.chatbot_schema import ChatRequest, ChatResponse, ChatMode
 from app.api.dependencies import get_current_user
-from app.services.chatbot_service_hybrid import hybrid_chatbot_service as chatbot_service
+from app.services.chatbot.hybrid_service import hybrid_chatbot_service as chatbot_service
 from datetime import datetime, UTC
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
@@ -456,7 +456,7 @@ async def get_conversation_history(
 )
 async def get_chatbot_status():
     """Get chatbot configuration status."""
-    from app.core.config import settings
+    from config.settings import settings
 
     # Check if any implementation is available
     is_configured = (
@@ -847,3 +847,86 @@ async def get_user_context(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Failed to get user context: {str(e)}"
         )
+
+
+# ============================================================================
+# RAG Pipeline Chat Endpoint
+# ============================================================================
+
+class RAGChatRequest(BaseModel):
+    """Request model for RAG-powered chat."""
+    message: str
+    conversation_id: Optional[str] = None
+
+
+class RAGChatResponse(BaseModel):
+    """Response model for RAG-powered chat."""
+    answer: str
+    conversation_id: Optional[str] = None
+    confidence: float = 0.0
+    has_relevant_context: bool = False
+    similarity_score: float = 0.0
+    sources: List[Dict[str, Any]] = []
+    status: str = "success"
+    timestamp: str = ""
+
+
+@chatbot_router.post(
+    "/chat/rag",
+    response_model=RAGChatResponse,
+    summary="RAG-powered chat with semantic knowledge base search",
+    description="""
+    Chat endpoint that uses the full RAG (Retrieval-Augmented Generation) pipeline.
+
+    Pipeline steps:
+    1. Validates the query
+    2. Generates query embedding using Gemini
+    3. Performs semantic search across the knowledge base
+    4. Generates a context-aware response using the retrieved information
+
+    Returns the answer with confidence scores, similarity metrics, and source references.
+    """
+)
+async def chat_rag(
+    request: RAGChatRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """RAG-powered chat endpoint."""
+    try:
+        from app.services.rag.chat_pipeline import chat_with_rag
+
+        user_name = current_user.full_name if hasattr(current_user, 'full_name') else "Student"
+        user_role = current_user.role.value if hasattr(current_user.role, 'value') else "student"
+
+        result = await chat_with_rag(
+            query=request.message,
+            user_name=user_name,
+            user_role=user_role,
+            conversation_id=request.conversation_id
+        )
+
+        return RAGChatResponse(
+            answer=result.get("answer", "Sorry, I couldn't generate a response."),
+            conversation_id=request.conversation_id or f"rag-{uuid.uuid4().hex[:12]}",
+            confidence=result.get("confidence", 0.0),
+            has_relevant_context=result.get("has_relevant_context", False),
+            similarity_score=result.get("similarity_score", 0.0),
+            sources=result.get("sources", []),
+            status="success" if result.get("success") else "failed",
+            timestamp=datetime.now(UTC).isoformat()
+        )
+
+    except ImportError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="RAG pipeline dependencies not available"
+        )
+    except Exception as e:
+        logging.error(f"RAG chat error: {e}")
+        traceback.print_exc()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"RAG chat failed: {str(e)}"
+        )
+

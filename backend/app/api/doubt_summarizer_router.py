@@ -14,9 +14,9 @@ import os
 import logging
 
 # Import database session dependency
-from app.core.db import get_db
+from config.db import get_db
 from app.api.dependencies import get_current_user
-from app.core.config import settings
+from config.settings import settings
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -25,8 +25,8 @@ logger = logging.getLogger(__name__)
 from app.schemas.doubts import DoubtUploadCreate, WeeklySummaryResponse
 
 # Import the service
-from app.services.doubt_summarizer_service import doubt_summarizer_service
-from app.services.doubt_export_service import doubt_export_service
+from app.services.doubts.summarizer_service import doubt_summarizer_service
+from app.services.doubts.export_service import doubt_export_service
 
 # Email Configuration
 def get_mail_config():

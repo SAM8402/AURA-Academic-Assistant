@@ -19,7 +19,7 @@ from app.models.user import User
 from app.models.query import Query, QueryResponse
 from app.schemas.query_schema import QueryStatus, QueryPriority, QueryCategory
 from app.schemas.user_schema import UserRole
-from app.core.security import hash_password
+from config.security import hash_password
 
 
 @pytest.mark.api

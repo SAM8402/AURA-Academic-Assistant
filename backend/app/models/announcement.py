@@ -6,7 +6,7 @@ This module defines the Announcement model for system-wide and course-specific a
 
 from sqlalchemy import Column, Integer, String, Text, DateTime, ForeignKey, Boolean, Enum as SQLEnum, func
 from sqlalchemy.orm import relationship
-from app.core.db import Base
+from config.db import Base
 from app.schemas.announcement_schema import AnnouncementType, AnnouncementTarget
 
 

@@ -20,7 +20,7 @@ except ImportError:
 
 # Config import
 try:
-    from app.core.config import settings
+    from config.settings import settings
 except ImportError:
     import os
     class MockSettings:

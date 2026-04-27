@@ -23,7 +23,7 @@ except ImportError:
     ConversationBufferMemory = None  # type: ignore
     ConversationChain = None  # type: ignore
 
-from app.core.config import settings
+from config.settings import settings
 from app.schemas.chatbot_schema import ChatMode
 
 logger = logging.getLogger(__name__)

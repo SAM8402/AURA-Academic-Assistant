@@ -1,9 +1,18 @@
 """
 Services package for business logic.
+
+Organized into domain-specific subpackages:
+- chatbot/  : Chatbot service implementations
+- quiz/     : Quiz generation and database services
+- slides/   : Slide deck generation, charts, export services
+- doubts/   : Doubt summarization and export services
+- video/    : Video summary services
+- rag/      : RAG pipeline (embedding, ingest, search, chat)
 """
 
-from .chatbot_service import ChatbotService
-from .quiz_service import QuizService
-from .slides_service import SlidesService, SlideTheme
+from .chatbot.base_service import ChatbotService
+from .quiz.generator_service import QuizService
+from .slides.base_service import SlidesService, SlideTheme
 
 __all__ = ["ChatbotService", "QuizService", "SlidesService", "SlideTheme"]
+

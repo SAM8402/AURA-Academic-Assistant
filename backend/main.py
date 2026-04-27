@@ -28,8 +28,8 @@ except ImportError:
     LANGCHAIN_AVAILABLE = False
     ChatGoogleGenerativeAI = None
 
-from app.core.config import settings
-from app.core.db import init_db
+from config.settings import settings
+from config.db import init_db
 from app.api.auth import auth_router
 from app.api.chatbot import chatbot_router
 from app.api.knowledge import router as knowledge_router

@@ -2,7 +2,7 @@ from logging.config import fileConfig
 from sqlalchemy import engine_from_config, pool
 from alembic import context
 
-from app.core.db import Base
+from config.db import Base
 from app.models import user  # import your models here!
 
 # Load Alembic configuration

@@ -7,7 +7,7 @@ like embedding generation, query processing, etc.
 
 from sqlalchemy import Column, String, DateTime, Text, ForeignKey, Index
 from sqlalchemy.orm import relationship
-from app.core.db import Base
+from config.db import Base
 from app.models.types import GUID
 from datetime import datetime
 import uuid

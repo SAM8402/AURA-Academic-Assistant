@@ -13,7 +13,7 @@ This module tests:
 import pytest
 from unittest.mock import Mock, patch, AsyncMock, MagicMock
 import asyncio
-from app.services.chatbot_service_hybrid import (
+from app.services.chatbot.hybrid_service import (
     HybridChatbotService,
     ChatImplementation,
     ChatMode

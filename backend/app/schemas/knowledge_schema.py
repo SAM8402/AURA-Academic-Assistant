@@ -36,6 +36,7 @@ class KnowledgeSourceOut(BaseModel):
     title: str
     description: Optional[str] = None
     content: str
+    file_path: Optional[str] = None
     category: CategoryEnum
     is_active: bool
     created_at: datetime
