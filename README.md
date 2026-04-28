@@ -5,14 +5,17 @@
 ![Python](https://img.shields.io/badge/Python-3776AB?style=for-the-badge&logo=python&logoColor=white)
 ![TailwindCSS](https://img.shields.io/badge/Tailwind_CSS-38B2AC?style=for-the-badge&logo=tailwind-css&logoColor=white)
 
-**AURA** is an intelligent platform designed to streamline academic support. It provides students with an AI-powered chat interface to get instant help on their coursework, while offering powerful summarization and analytics tools for Teaching Assistants (TAs) and instructors.
+**AURA (Academic Unified Response Assistant)** is an intelligent, multi-role platform designed to bridge the gap between student needs and instructional efficiency. By leveraging Retrieval-Augmented Generation (RAG) and specialized AI agents, AURA provides students with immediate, context-aware academic support while empowering Teaching Assistants (TAs) and Instructors with automated content generation, doubt summarization, and deep learning analytics.
 
 ##  Features
 
-- **AI-Powered Student Chat**: Students can ask questions and receive instant, context-aware answers from an AI assistant powered by Google Gemini.
-- **Doubt Summarization**: TAs can generate insightful summaries of student doubts over various periods (daily, weekly, monthly).
-- **Email & PDF Export**: Summaries can be exported as a formatted PDF and sent directly to an email address.
-- **Role-Based Access**: Separate interfaces and functionalities for students and TAs.
+- **RAG-Powered Student Chat**: Instant, context-aware answers using advanced Retrieval-Augmented Generation (Google Gemini) for high accuracy.
+- **Personal Student Resources**: A dedicated space for students to upload, pin, and manage study documents, images, and web links.
+- **AI Onboarding Mentor**: A specialized conversational guide for TAs, trained on senior TA experiences and institutional best practices.
+- **AI Learning Material Generation**: Automated generation of comprehensive slide decks and interactive quizzes based on course topics and user feedback.
+- **Doubt Summarization**: Intelligent analysis and grouping of student queries over various periods (daily, weekly, monthly).
+- **Automated Reporting**: Export summarized doubt reports to PDF and send them via SMTP (Gmail, Outlook, SES, etc.).
+- **Role-Based Dashboards**: Specialized interfaces for Students, TAs, Instructors, and Admins.
 - **Theming**: A modern UI with both light and dark modes.
 - **High-Performance Backend**: Built with FastAPI, ensuring a fast and scalable API.
 
@@ -21,10 +24,43 @@
 | Area         | Technology                                                                                             |
 |--------------|--------------------------------------------------------------------------------------------------------|
 | **Frontend** | Vue.js, Pinia, Vue Router, Tailwind CSS |
-| **Backend**  | Python, FastAPI, SQLAlchemy, Alembic |
-| **Database** | SQLite (default), easily configurable for PostgreSQL, etc.          |
+| **Backend**  | Python 3.9+, FastAPI, SQLAlchemy, Pydantic, Alembic |
+| **Database** | SQLite (default/dev), PostgreSQL (prod-ready)          |
 | **AI/LLM**   | Google Gemini                                                                |
-| **Emailing** | fastapi-mail                                                 |
+| **Emailing** | fastapi-mail (SMTP)                                                 |
+
+##  File Structure
+
+```text
+.
+├── backend/
+│   ├── alembic/              # Database migrations
+│   ├── app/
+│   │   ├── api/              # API endpoints and routers
+│   │   ├── core/             # Security and main configuration
+│   │   ├── models/           # SQLAlchemy database models
+│   │   ├── schemas/          # Pydantic validation schemas
+│   │   └── services/         # Logic, RAG pipelines, and AI services
+│   ├── config/               # DB connection and environment setup
+│   ├── uploads/              # Local storage for student/knowledge files
+│   ├── main.py               # FastAPI entry point
+│   └── requirements.txt      # Python dependencies
+├── frontend/
+│   ├── src/
+│   │   ├── api/              # Axios service abstractions
+│   │   ├── components/       # UI components (Admin, Student, TA, Instructor)
+│   │   │   ├── Admin/        # Analytics and user management
+│   │   │   ├── student/      # Chat and resource tools
+│   │   │   ├── instructor/   # Content generation and reports
+│   │   │   └── TA/           # Doubts and onboarding mentor
+│   │   ├── router/           # Vue Router definitions per role
+│   │   ├── store/            # Pinia state management
+│   │   └── views/            # Main layout containers
+│   ├── package.json          # Node.js dependencies
+│   └── tailwind.config.js    # Styling configuration
+├── EMAIL_CONFIGURATION.md    # Guide for SMTP setup
+└── README.md                 # Project documentation
+```
 
 ##  Getting Started
 
