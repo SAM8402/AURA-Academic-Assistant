@@ -19,7 +19,6 @@
 - **Theming**: A modern UI with both light and dark modes.
 - **High-Performance Backend**: Built with FastAPI, ensuring a fast and scalable API.
 
-![AURA Chatbot Mindmap](aura_chatbot_mindmap.png)
 
 ##  Tech Stack
 
@@ -77,8 +76,8 @@ Follow these instructions to get a copy of the project up and running on your lo
 ### 1. Clone the Repository
 
 ```bash
-git clone https://github.com/your-username/soft-engg-project-sep-2025-se-SEP-12.git
-cd soft-engg-project-sep-2025-se-SEP-12
+git clone https://github.com/your-username/AURA-Academic-Assistant.git
+cd AURA-Academic-Assistant
 ```
 
 ### 2. Backend Setup
