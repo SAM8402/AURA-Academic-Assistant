@@ -10,9 +10,9 @@ Organized into domain-specific subpackages:
 - rag/      : RAG pipeline (embedding, ingest, search, chat)
 """
 
-from .chatbot.base_service import ChatbotService
+from .chatbot.base_service import ChatOrchestrator
 from .quiz.generator_service import QuizService
 from .slides.base_service import SlidesService, SlideTheme
 
-__all__ = ["ChatbotService", "QuizService", "SlidesService", "SlideTheme"]
+__all__ = ["ChatOrchestrator", "QuizService", "SlidesService", "SlideTheme"]
 

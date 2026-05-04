@@ -1,7 +1,10 @@
 """
 Chatbot services package.
 
-Contains the chatbot service implementations:
-- ChatbotService: Basic LangChain-based chatbot
-- HybridChatbotService: Dual-mode chatbot (LangChain + Google ADK)
+- base_service.py: Core chatbot (Orchestrator, PromptBuilder, LLMProvider)
+- hybrid_service.py: Supporting infrastructure (MemoryManager, RetrievalOrchestrator)
 """
+
+from app.services.chatbot.base_service import ChatOrchestrator, chatbot_service
+
+__all__ = ["ChatOrchestrator", "chatbot_service"]

@@ -20,7 +20,13 @@ import os
 
 from langgraph.graph import StateGraph, END
 from sqlalchemy.orm import Session
-import requests
+
+try:
+    from langchain_google_genai import ChatGoogleGenerativeAI
+    _LANGCHAIN_AVAILABLE = True
+except ImportError:
+    _LANGCHAIN_AVAILABLE = False
+    ChatGoogleGenerativeAI = None
 
 from config.db import SessionLocal
 from config.settings import settings
@@ -69,26 +75,40 @@ class ChatRAGState(TypedDict, total=False):
 # UTILITY FUNCTIONS
 # ============================================================================
 
+def _build_rag_llm():
+    api_keys = [k.strip() for k in settings.GOOGLE_API_KEY.split(",") if k.strip()]
+    if not api_keys:
+        api_keys = [""]
+
+    models = ["gemini-3.0-flash", "gemini-3.1-flash-lite", "gemini-2.5-flash", "gemma-3-27b"]
+    llms = []
+
+    for model_name in models:
+        for key in api_keys:
+            llms.append(
+                ChatGoogleGenerativeAI(
+                    model=model_name,
+                    google_api_key=key,
+                    temperature=0.1,
+                    max_retries=1,
+                )
+            )
+
+    return llms[0].with_fallbacks(llms[1:])
+
+
 def call_gemini_llm(prompt: str, context: str) -> Dict[str, Any]:
     """
-    Call Gemini API for response generation with RAG context.
-
-    Args:
-        prompt: User question
-        context: Retrieved knowledge context
-
-    Returns:
-        Response dictionary with answer and metadata
+    Call Gemini LLM for response generation with RAG context.
+    Uses _build_rag_llm() with multi-model fallback via LangChain.
     """
-    api_key = settings.GOOGLE_API_KEY
-    if not api_key:
+    if not _LANGCHAIN_AVAILABLE:
+        logger.error("langchain-google-genai not installed")
+        return {"error": "LangChain not available"}
+
+    if not settings.GOOGLE_API_KEY or settings.GOOGLE_API_KEY == "your-google-api-key":
         logger.error("No Google API key available")
         return {"error": "API key not available"}
-
-    endpoint = (
-        f"https://generativelanguage.googleapis.com/v1beta/models/"
-        f"{LLM_MODEL}:generateContent"
-    )
 
     full_prompt = f"""You are AURA (Academic Unified Response Assistant), an AI assistant for students.
 Provide helpful, accurate, and concise answers based on the context provided.
@@ -108,43 +128,20 @@ Instructions:
 
 Response:"""
 
-    payload = {
-        "contents": [{"parts": [{"text": full_prompt}]}],
-        "generationConfig": {
-            "temperature": 0.3,
-            "maxOutputTokens": 2048,
-            "topP": 0.8,
-            "topK": 40
-        }
-    }
-
     try:
-        response = requests.post(
-            f"{endpoint}?key={api_key}",
-            json=payload,
-            headers={"Content-Type": "application/json"},
-            timeout=TIMEOUT_SECONDS
-        )
+        llm = _build_rag_llm()
+        response = llm.invoke(full_prompt)
+        answer_text = response.content.strip() if hasattr(response, "content") else str(response).strip()
+        confidence = _calculate_confidence(answer_text, context)
 
-        if response.status_code == 200:
-            result = response.json()
-            candidates = result.get("candidates", [])
-            if candidates and candidates[0].get("content", {}).get("parts"):
-                answer_text = candidates[0]["content"]["parts"][0]["text"].strip()
-                confidence = _calculate_confidence(answer_text, context)
-
-                return {
-                    "answer": answer_text,
-                    "confidence": confidence,
-                    "token_usage": result.get("usageMetadata", {}),
-                    "success": True
-                }
-        else:
-            logger.error("Gemini LLM API error: %d - %s", response.status_code, response.text)
-            return {"error": f"API error: {response.status_code}"}
+        return {
+            "answer": answer_text,
+            "confidence": confidence,
+            "success": True,
+        }
 
     except Exception as e:
-        logger.error("Error calling Gemini LLM API: %s", e)
+        logger.error("LLM call failed: %s", e)
         return {"error": str(e)}
 
 

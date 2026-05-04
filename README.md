@@ -19,6 +19,8 @@
 - **Theming**: A modern UI with both light and dark modes.
 - **High-Performance Backend**: Built with FastAPI, ensuring a fast and scalable API.
 
+![AURA Chatbot Mindmap](aura_chatbot_mindmap.png)
+
 ##  Tech Stack
 
 | Area         | Technology                                                                                             |

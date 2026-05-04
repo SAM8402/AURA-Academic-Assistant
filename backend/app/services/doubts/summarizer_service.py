@@ -42,7 +42,7 @@ from app.schemas.doubts import DoubtUploadCreate, WeeklySummaryResponse
 
 class DoubtSummarizerService:
     def __init__(self):
-        """Initialize LLM + JSON parser"""
+        """Initialize LLM with multi-model fallback + JSON parser."""
         self.llm = None
         self.parser = None
 
@@ -51,20 +51,38 @@ class DoubtSummarizerService:
             logger.warning("Install with: pip install langchain langchain-google-genai")
             return
 
-        if not settings.GOOGLE_API_KEY:
+        if not settings.GOOGLE_API_KEY or settings.GOOGLE_API_KEY == "your-google-api-key":
             logger.warning("[WARNING] Google API Key missing - LLM disabled.")
             return
 
         try:
             self.parser = JsonOutputParser(pydantic_object=WeeklySummaryResponse)
-            self.llm = ChatGoogleGenerativeAI(
-                model=settings.GEMINI_MODEL,
-                google_api_key=settings.GOOGLE_API_KEY,
-                temperature=0.2
-            )
-            logger.info("DoubtSummarizerService initialized successfully.")
+            self.llm = self._build_rag_llm()
+            logger.info("DoubtSummarizerService initialized with multi-model fallback.")
         except Exception as e:
             logger.error(f"Failed to initialize LLM: {e}")
+
+    @staticmethod
+    def _build_rag_llm():
+        api_keys = [k.strip() for k in settings.GOOGLE_API_KEY.split(",") if k.strip()]
+        if not api_keys:
+            api_keys = [""]
+
+        models = ["gemini-3.0-flash", "gemini-3.1-flash-lite", "gemini-2.5-flash", "gemma-3-27b"]
+        llms = []
+
+        for model_name in models:
+            for key in api_keys:
+                llms.append(
+                    ChatGoogleGenerativeAI(
+                        model=model_name,
+                        google_api_key=key,
+                        temperature=0.1,
+                        max_retries=1,
+                    )
+                )
+
+        return llms[0].with_fallbacks(llms[1:])
 
     # -------------------------------------------------------------------------
     # Task 1 — Save Upload + Messages

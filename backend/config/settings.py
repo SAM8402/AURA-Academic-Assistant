@@ -173,11 +173,11 @@ class Settings(BaseSettings):
     # AI/LLM Settings (Gemini)
     GOOGLE_API_KEY: str = Field(
         default="your-google-api-key",
-        description="Google Gemini API Key (REQUIRED - get from https://makersuite.google.com/app/apikey)"
+        description="Google Gemini API Key(s). Comma-separated for key rotation. (REQUIRED)"
     )
     GEMINI_MODEL: str = Field(
         default="gemini-2.5-flash",
-        description="Gemini model to use (gemini-2.5-flash, gemini-2.5-pro, gemini-flash-latest, gemini-pro-latest)"
+        description="Primary Gemini model to use"
     )
     GEMINI_TEMPERATURE: float = Field(
         default=0.7,
