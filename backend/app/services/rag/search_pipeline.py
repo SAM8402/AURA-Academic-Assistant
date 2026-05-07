@@ -169,6 +169,60 @@ def semantic_search_sqlite(
     results.sort(key=lambda x: x["score"], reverse=True)
     return results[:top_k]
 
+def semantic_search_chroma(
+    query_embedding: List[float],
+    top_k: int = DEFAULT_TOP_K,
+    filters: Optional[Dict[str, Any]] = None,
+    similarity_threshold: float = SIMILARITY_THRESHOLD
+) -> List[Dict[str, Any]]:
+    """
+    Execute semantic vector search using ChromaDB.
+    """
+    from app.services.rag.chroma_client import get_chroma_collection
+    collection = get_chroma_collection()
+
+    where_filter = {}
+    if filters and filters.get("category"):
+        where_filter = {"category": filters["category"]}
+
+    try:
+        results = collection.query(
+            query_embeddings=[query_embedding],
+            n_results=top_k,
+            where=where_filter if where_filter else None,
+            include=["documents", "metadatas", "distances"]
+        )
+    except Exception as e:
+        logger.error("ChromaDB query failed: %s", e)
+        return []
+
+    if not results or not results.get("ids") or not results["ids"][0]:
+        return []
+
+    formatted_results = []
+    for i in range(len(results["ids"][0])):
+        distance = results["distances"][0][i]
+        similarity = 1.0 - distance
+
+        if similarity >= similarity_threshold:
+            metadata = results["metadatas"][0][i]
+            formatted_results.append({
+                "id": results["ids"][0][i],
+                "content": results["documents"][0][i],
+                "source_id": metadata.get("source_id"),
+                "source_title": metadata.get("source_title"),
+                "source_category": metadata.get("category"),
+                "score": similarity,
+                "chunk_index": metadata.get("index", 0),
+                "token_count": 0,
+                "word_count": len(results["documents"][0][i].split()),
+                "metadata": {}
+            })
+
+    # Sort by score descending just in case
+    formatted_results.sort(key=lambda x: x["score"], reverse=True)
+    return formatted_results
+
 
 # ============================================================================
 # PIPELINE NODES
@@ -281,8 +335,7 @@ def execute_search(state: SearchState) -> SearchState:
 
     session: Session = SessionLocal()
     try:
-        results = semantic_search_sqlite(
-            session=session,
+        results = semantic_search_chroma(
             query_embedding=state["query_embedding"],
             top_k=state["top_k"],
             filters=state.get("filters", {})

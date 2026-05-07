@@ -44,6 +44,12 @@ MAX_SESSION_TURNS = 10
 MAX_SUMMARY_LENGTH = 500
 MAX_PERSISTENT_SESSIONS = 5
 
+# Chatbot-specific model config (independent of settings.py)
+# NOTE: Model selection now uses _build_rag_llm() with multi-model fallback
+# No default model needed — fallback chain handles model selection
+CHATBOT_TEMPERATURE = 0.7
+CHATBOT_MAX_TOKENS = 1024
+
 # Retrieval (used by tools)
 RAG_TOP_K = 5
 RAG_SIMILARITY_THRESHOLD = 0.3
@@ -306,44 +312,47 @@ try:
     _LANGCHAIN_AVAILABLE = True
 except ImportError:
     _LANGCHAIN_AVAILABLE = False
-    ChatGoogleGenerativeAI = None
 
+from app.services.rag.llm_builder import build_robust_llm
 
 def _build_rag_llm():
-    api_keys = [k.strip() for k in settings.GOOGLE_API_KEY.split(",") if k.strip()]
-    if not api_keys:
-        api_keys = [""]
-
-    models = ["gemini-3.0-flash", "gemini-3.1-flash-lite", "gemini-2.5-flash", "gemma-3-27b"]
-    llms = []
-
-    for model_name in models:
-        for key in api_keys:
-            llms.append(
-                ChatGoogleGenerativeAI(
-                    model=model_name,
-                    google_api_key=key,
-                    temperature=0.1,
-                    max_retries=1,
-                )
-            )
-
-    return llms[0].with_fallbacks(llms[1:])
+    """
+    Build RAG LLM with multi-model fallback chain.
+    """
+    llm, models = build_robust_llm(temperature=0.1, max_retries=1)
+    if not llm:
+        raise ValueError("No LLM instances created. Check GOOGLE_API_KEY configuration.")
+        
+    logger.info(f"[OK] RAG Chatbot initialized with dynamic multi-model fallback: {models[0]} -> {models[1:]}")
+    return llm
 
 
 class LLMProvider:
     """
     Wraps Google Genai SDK + LangChain for chat generation.
 
+    Maintains a flat list of (model, api_key) combos built from
+    CHATBOT_MODELS x all API keys. On 429 / 503 / RESOURCE_EXHAUSTED,
+    automatically rotates to the next combo so the user never sees
+    raw API errors.
+
     - generate()            — Uses _build_rag_llm() with multi-model fallback
     - generate_with_tools() — Uses google.genai SDK (required for function calling)
     - generate_stream()     — Uses google.genai SDK for streaming
     """
 
+    # Models to cycle through (order = priority)
+    # Ordered by performance: fastest → reliable → stable → fallback
+    @property
+    def CHATBOT_MODELS(self):
+        return [m.strip() for m in settings.LLM_FALLBACK_CHAIN.split(",") if m.strip()]
+
     def __init__(self):
         self.client = None
-        self.model = settings.GEMINI_MODEL
+        self.model = None
         self._available = False
+        self._combos: List[tuple] = []   # [(model, key), ...]
+        self._combo_idx = 0
         self._init_client()
 
     def _init_client(self) -> None:
@@ -351,18 +360,62 @@ class LLMProvider:
             logger.warning("Google Genai SDK not installed. Run: pip install google-genai")
             return
 
-        api_key = settings.GOOGLE_API_KEY
-        if not api_key or api_key == "your-google-api-key":
+        raw_key = settings.GOOGLE_API_KEY
+        if not raw_key or raw_key == "your-google-api-key":
             logger.warning("GOOGLE_API_KEY not configured")
             return
 
+        api_keys = [k.strip() for k in raw_key.split(",") if k.strip()]
+        if not api_keys:
+            logger.warning("No valid API keys found in GOOGLE_API_KEY")
+            return
+
+        # Build flat list: every model × every key
+        self._combos = [(m, k) for m in self.CHATBOT_MODELS for k in api_keys]
+        self._combo_idx = 0
+
+        # Activate the first combo
+        self._activate_combo(0)
+
+    def _activate_combo(self, idx: int) -> bool:
+        """Activate (model, key) combo at the given index. Returns success."""
+        if not self._combos:
+            return False
+        self._combo_idx = idx % len(self._combos)
+        model, key = self._combos[self._combo_idx]
         try:
-            os.environ["GOOGLE_API_KEY"] = api_key.split(",")[0].strip()
-            self.client = genai.Client(api_key=api_key.split(",")[0].strip())
+            os.environ["GOOGLE_API_KEY"] = key
+            self.client = genai.Client(api_key=key)
+            self.model = model
             self._available = True
-            logger.info("LLM Provider initialized — model: %s", self.model)
+            logger.info("LLM active: model=%s, key=...%s (combo %d/%d)",
+                        model, key[-6:], self._combo_idx + 1, len(self._combos))
+            return True
         except Exception as e:
-            logger.error("Failed to initialize LLM Provider: %s", e)
+            logger.error("Failed to activate combo %d (%s): %s", self._combo_idx, model, e)
+            return False
+
+    def _rotate(self) -> bool:
+        """Rotate to the next (model, key) combo. Returns True if a new combo was activated."""
+        if len(self._combos) <= 1:
+            return False
+        start = self._combo_idx
+        for offset in range(1, len(self._combos)):
+            next_idx = (start + offset) % len(self._combos)
+            if self._activate_combo(next_idx):
+                logger.warning("Rotated to combo %d: model=%s", next_idx, self.model)
+                return True
+        return False
+
+    @staticmethod
+    def _is_exhaustion_error(error: Exception) -> bool:
+        """Check if an exception is a rate-limit or model-unavailable error."""
+        err = str(error).lower()
+        return any(marker in err for marker in [
+            "429", "resource_exhausted", "503", "unavailable",
+            "quota", "rate limit", "overloaded",
+            "404", "not_found", "not found",
+        ])
 
     @property
     def is_available(self) -> bool:
@@ -388,7 +441,7 @@ class LLMProvider:
 
         except Exception as e:
             logger.error("LLM generation failed: %s", e)
-            return f"I apologize, but I encountered an error: {str(e)}"
+            return "I'm sorry, I'm temporarily unable to process your request. Please try again in a moment."
 
     # -- Agentic generation (with function calling) ---------------------------
 
@@ -399,6 +452,7 @@ class LLMProvider:
         user_message: str,
         tool_declarations: list,
         tool_executor,
+        _retry_count: int = 0,
     ) -> tuple[str, List[str]]:
         """
         Agentic generation with function calling loop.
@@ -406,6 +460,8 @@ class LLMProvider:
         Uses google.genai SDK directly (required for function calling).
         The LLM decides which tools to call. We execute them and feed results
         back until the LLM produces a final text response.
+
+        On exhaustion errors, automatically rotates to the next (model, key) combo.
 
         Returns: (response_text, list_of_tools_used)
         """
@@ -419,8 +475,8 @@ class LLMProvider:
             gemini_tools = [types.Tool(function_declarations=tool_declarations)]
 
             config = types.GenerateContentConfig(
-                temperature=settings.GEMINI_TEMPERATURE,
-                max_output_tokens=settings.GEMINI_MAX_TOKENS,
+                temperature=CHATBOT_TEMPERATURE,
+                max_output_tokens=CHATBOT_MAX_TOKENS,
                 system_instruction=system_prompt,
                 tools=gemini_tools,
             )
@@ -490,8 +546,8 @@ class LLMProvider:
             # Exhausted max rounds — do one final call WITHOUT tools
             logger.warning("Exhausted %d tool rounds, generating final response", MAX_TOOL_ROUNDS)
             final_config = types.GenerateContentConfig(
-                temperature=settings.GEMINI_TEMPERATURE,
-                max_output_tokens=settings.GEMINI_MAX_TOKENS,
+                temperature=CHATBOT_TEMPERATURE,
+                max_output_tokens=CHATBOT_MAX_TOKENS,
                 system_instruction=system_prompt,
             )
             final_response = await self.client.aio.models.generate_content(
@@ -503,8 +559,22 @@ class LLMProvider:
             return text or "I couldn't generate a response.", tools_used
 
         except Exception as e:
+            # Auto-rotate on exhaustion errors (429, 503, quota, etc.)
+            if self._is_exhaustion_error(e) and _retry_count < len(self._combos):
+                logger.warning("Model/key exhausted (%s:%s), rotating... (attempt %d)",
+                               self.model, str(e)[:60], _retry_count + 1)
+                if self._rotate():
+                    return await self.generate_with_tools(
+                        system_prompt=system_prompt,
+                        history=history,
+                        user_message=user_message,
+                        tool_declarations=tool_declarations,
+                        tool_executor=tool_executor,
+                        _retry_count=_retry_count + 1,
+                    )
+
             logger.error("Agentic generation failed: %s", e, exc_info=True)
-            return f"I apologize, but I encountered an error: {str(e)}", tools_used
+            return "I'm sorry, I encountered a temporary issue. Please try again.", tools_used
 
     # -- Streaming generation -------------------------------------------------
 
@@ -514,32 +584,41 @@ class LLMProvider:
         history: List[dict],
         user_message: str,
     ) -> AsyncIterator[str]:
-        """Generate a streaming response. Yields text chunks."""
+        """Generate a streaming response. Yields text chunks.
+        On exhaustion errors, rotates to the next (model, key) combo and retries."""
         if not self.is_available:
             yield "Chat service is not configured. Please check GOOGLE_API_KEY."
             return
 
-        try:
-            config = types.GenerateContentConfig(
-                temperature=settings.GEMINI_TEMPERATURE,
-                max_output_tokens=settings.GEMINI_MAX_TOKENS,
-                system_instruction=system_prompt,
-            )
+        for attempt in range(len(self._combos) if self._combos else 1):
+            try:
+                config = types.GenerateContentConfig(
+                    temperature=CHATBOT_TEMPERATURE,
+                    max_output_tokens=CHATBOT_MAX_TOKENS,
+                    system_instruction=system_prompt,
+                )
 
-            contents = list(history)
-            contents.append({"role": "user", "parts": [{"text": user_message}]})
+                contents = list(history)
+                contents.append({"role": "user", "parts": [{"text": user_message}]})
 
-            async for chunk in await self.client.aio.models.generate_content_stream(
-                model=self.model,
-                contents=contents,
-                config=config,
-            ):
-                if hasattr(chunk, "text") and chunk.text:
-                    yield chunk.text
+                async for chunk in await self.client.aio.models.generate_content_stream(
+                    model=self.model,
+                    contents=contents,
+                    config=config,
+                ):
+                    if hasattr(chunk, "text") and chunk.text:
+                        yield chunk.text
 
-        except Exception as e:
-            logger.error("LLM streaming failed: %s", e)
-            yield f"Error: {str(e)}"
+                return  # Success — stop retrying
+
+            except Exception as e:
+                if self._is_exhaustion_error(e) and attempt < len(self._combos) - 1:
+                    logger.warning("Streaming: model/key exhausted (%s), rotating...", self.model)
+                    self._rotate()
+                    continue
+                logger.error("LLM streaming failed: %s", e)
+                yield "I'm sorry, I'm temporarily unable to respond. Please try again."
+                return
 
 
 # =============================================================================
@@ -668,14 +747,65 @@ class ChatOrchestrator:
             user_context = tool_executor.get_user_context()
             persistent_summaries = self.memory.load_persistent_summaries(db, user)
 
-            # 3. Build the user prompt (identity + memory, no retrieved context)
+            # 3. PRE-FETCH KB context (Nexora pattern) — always search the
+            #    knowledge base up front so the LLM has relevant context even
+            #    if the model doesn't call the search_knowledge_base tool.
+            kb_context_text = ""
+            kb_sources: List[Dict[str, Any]] = []
+            if use_knowledge_base:
+                try:
+                    from config.db import SessionLocal as _KBSession
+                    from app.services.rag.search_pipeline import semantic_search_chroma
+                    from app.services.rag.embedding_service import generate_embedding
+
+                    search_query = rewrite_query_for_rag(message)
+                    query_embedding = generate_embedding(search_query)
+
+                    if query_embedding:
+                        kb_session = _KBSession()
+                        try:
+                            kb_results = semantic_search_chroma(
+                                query_embedding=query_embedding,
+                                top_k=5,
+                                filters={},
+                                similarity_threshold=0.3,
+                            )
+                        finally:
+                            kb_session.close()
+
+                        if kb_results:
+                            parts = []
+                            for r in kb_results[:5]:
+                                title = r.get("source_title", "Unknown")
+                                content = r.get("content", "")[:600]
+                                score = r.get("score", 0)
+                                parts.append(f"[Source: {title} | relevance: {score:.2f}]\n{content}")
+                                kb_sources.append({"type": "knowledge", "title": title, "category": r.get("source_category", "")})
+                            kb_context_text = "\n\n".join(parts)
+                            logger.info("Pre-fetched %d KB results (top score=%.3f)", len(parts), kb_results[0].get("score", 0))
+                except Exception as kb_err:
+                    logger.warning("Pre-fetch KB search failed (non-fatal): %s", kb_err)
+
+            # 4. Build the user prompt (identity + memory + KB context)
             composed_prompt = build_agentic_prompt(
                 user_message=message,
                 user_context=user_context,
                 previous_summaries=persistent_summaries or None,
             )
 
-            # 4. Agentic generation — use the mode the frontend requested
+            # Inject KB context into the prompt so LLM always has it
+            if kb_context_text:
+                composed_prompt = (
+                    f"{composed_prompt}\n\n"
+                    f"--- KNOWLEDGE BASE RESULTS ---\n"
+                    f"The following content was found in the academic knowledge base. "
+                    f"Use this information to answer the question accurately. "
+                    f"Cite the source titles when referencing this content.\n\n"
+                    f"{kb_context_text}\n"
+                    f"--- END KNOWLEDGE BASE RESULTS ---"
+                )
+
+            # 5. Agentic generation — use the mode the frontend requested
             system_prompt = get_system_prompt(mode)
             history = self.memory.get_session_history(conv_id)
 
@@ -686,6 +816,13 @@ class ChatOrchestrator:
                 tool_declarations=TOOL_DECLARATIONS,
                 tool_executor=tool_executor,
             )
+
+            # Merge pre-fetched KB sources into tool_executor sources
+            if kb_sources:
+                for src in kb_sources:
+                    tool_executor._sources.append(src)
+                if "search_knowledge_base" not in tools_used:
+                    tools_used.append("search_knowledge_base")
 
             # 5. Save to memory
             self.memory.add_turn(conv_id, message, response)
@@ -765,8 +902,8 @@ class ChatOrchestrator:
             # then collect tool context and stream the final answer
             gemini_tools = [types.Tool(function_declarations=TOOL_DECLARATIONS)]
             config_with_tools = types.GenerateContentConfig(
-                temperature=settings.GEMINI_TEMPERATURE,
-                max_output_tokens=settings.GEMINI_MAX_TOKENS,
+                temperature=CHATBOT_TEMPERATURE,
+                max_output_tokens=CHATBOT_MAX_TOKENS,
                 system_instruction=system_prompt,
                 tools=gemini_tools,
             )
@@ -818,8 +955,8 @@ class ChatOrchestrator:
 
             # Max rounds exhausted — stream the final response without tools
             config_no_tools = types.GenerateContentConfig(
-                temperature=settings.GEMINI_TEMPERATURE,
-                max_output_tokens=settings.GEMINI_MAX_TOKENS,
+                temperature=CHATBOT_TEMPERATURE,
+                max_output_tokens=CHATBOT_MAX_TOKENS,
                 system_instruction=system_prompt,
             )
 

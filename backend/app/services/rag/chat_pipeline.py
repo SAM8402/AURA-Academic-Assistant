@@ -31,12 +31,11 @@ except ImportError:
 from config.db import SessionLocal
 from config.settings import settings
 from app.services.rag.embedding_service import generate_embedding
-from app.services.rag.search_pipeline import semantic_search_sqlite
+from app.services.rag.search_pipeline import semantic_search_chroma
 
 logger = logging.getLogger(__name__)
 
-# Configuration
-LLM_MODEL = os.getenv("LLM_MODEL", settings.GEMINI_MODEL)
+# Configuration — models are handled by _build_rag_llm() with multi-model fallback
 SIMILARITY_THRESHOLD = 0.35
 DEFAULT_TOP_K = 5
 TIMEOUT_SECONDS = 30
@@ -76,11 +75,33 @@ class ChatRAGState(TypedDict, total=False):
 # ============================================================================
 
 def _build_rag_llm():
+    """
+    Build RAG LLM with multi-model fallback chain.
+    
+    Implements robust model selection by:
+    1. Extracting comma-separated API keys from settings
+    2. Creating LLM instances for each model × API key combination
+    3. Chaining fallbacks: if one fails, automatically try the next
+    
+    Models are ordered by priority/speed:
+    - Primary: gemini-3.0-flash (fastest, most reliable)
+    - Secondary: gemini-3.1-flash-lite (alternative fast model)
+    - Tertiary: gemini-2.5-flash (stable backup)
+    - Fallback: gemma-3-27b-it (open model as last resort)
+    
+    Returns: LangChain ChatGoogleGenerativeAI with fallback chain
+    """
     api_keys = [k.strip() for k in settings.GOOGLE_API_KEY.split(",") if k.strip()]
     if not api_keys:
         api_keys = [""]
 
-    models = ["gemini-3.0-flash", "gemini-3.1-flash-lite", "gemini-2.5-flash", "gemma-3-27b"]
+    # Model priority order: fast & reliable → stable → open-source
+    models = [
+        "gemini-3.0-flash",           # Primary: fastest, best for RAG
+        "gemini-3.1-flash-lite",      # Secondary: solid alternative
+        "gemini-2.5-flash",           # Tertiary: proven stable
+        "gemma-3-27b-it"              # Fallback: open-source option
+    ]
     llms = []
 
     for model_name in models:
@@ -94,6 +115,9 @@ def _build_rag_llm():
                 )
             )
 
+    if not llms:
+        raise ValueError("No LLM instances created. Check GOOGLE_API_KEY configuration.")
+    
     return llms[0].with_fallbacks(llms[1:])
 
 
@@ -231,8 +255,7 @@ def search_knowledge_base(state: ChatRAGState) -> ChatRAGState:
     try:
         embedding = state["query_embedding"]
 
-        search_results = semantic_search_sqlite(
-            session=session,
+        search_results = semantic_search_chroma(
             query_embedding=embedding,
             top_k=DEFAULT_TOP_K,
             filters={}

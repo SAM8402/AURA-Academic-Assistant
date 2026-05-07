@@ -32,6 +32,8 @@ from app.services.slides.graph_validator import graph_validator
 logger = logging.getLogger(__name__)
 
 
+from app.services.rag.llm_builder import build_robust_llm
+
 class GraphType(str, Enum):
     BAR = "bar"
     LINE = "line"
@@ -86,12 +88,16 @@ class SlideDeckService:
         try:
             self.parser = JsonOutputParser(pydantic_object=SlideDeck)
             self.preview_parser = JsonOutputParser(pydantic_object=SlideDeckPreview)
-            self.llm = ChatGoogleGenerativeAI(
-                model=settings.GEMINI_MODEL,
-                google_api_key=settings.GOOGLE_API_KEY,
-                temperature=0.7,
-            )
-            logger.info(f"[OK] SlideDeckService initialized with Gemini model: {settings.GEMINI_MODEL}")
+            
+            # Dynamic multi-model fallback chain
+            llm, models = build_robust_llm(temperature=0.7)
+            
+            if llm:
+                self.llm = llm
+                logger.info(f"[OK] SlideDeckService initialized with dynamic multi-model fallback: {models[0]} -> {models[1:]}")
+            else:
+                logger.warning("[WARNING] No LLMs configured for SlideDeckService.")
+                
         except Exception as e:
             logger.error(f"[ERROR] Failed to initialize Gemini LLM for SlideDeckService: {e}")
 

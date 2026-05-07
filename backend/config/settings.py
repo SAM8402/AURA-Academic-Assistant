@@ -170,30 +170,28 @@ class Settings(BaseSettings):
         description="Use SSL for SMTP connection"
     )
 
-    # AI/LLM Settings (Gemini)
+    # AI/LLM Settings — API key + defaults for non-chatbot services
     GOOGLE_API_KEY: str = Field(
         default="your-google-api-key",
         description="Google Gemini API Key(s). Comma-separated for key rotation. (REQUIRED)"
     )
     GEMINI_MODEL: str = Field(
         default="gemini-2.5-flash",
-        description="Primary Gemini model to use"
+        description="Default Gemini model (used by slides, quiz, video services)"
+    )
+    LLM_FALLBACK_CHAIN: str = Field(
+        default="gemini-3.0-flash,gemini-3-flash-preview,gemini-3.1-flash-lite,gemini-3.1-flash-lite-preview,gemini-2.5-flash,gemini-2.5-flash-lite,gemma-3-27b,gemma-3-27b-it",
+        description="Comma-separated list of models to use for LLM fallback chain"
     )
     GEMINI_TEMPERATURE: float = Field(
         default=0.7,
         ge=0.0,
-        le=1.0,
-        description="Temperature for response randomness (0.0-1.0)"
+        le=2.0,
+        description="Temperature for response randomness"
     )
     GEMINI_MAX_TOKENS: int = Field(
         default=1024,
         description="Maximum tokens in response"
-    )
-    CHATBOT_SYSTEM_PROMPT: str = Field(
-        default="""You are AURA (Academic Unified Response Assistant), an AI teaching assistant for students.
-        You help with academic questions, provide explanations, and assist with learning.
-        Be helpful, educational, and encouraging. Keep responses clear and concise.""",
-        description="System prompt for chatbot"
     )
 
     class Config:

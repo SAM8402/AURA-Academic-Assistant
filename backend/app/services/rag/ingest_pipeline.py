@@ -402,7 +402,21 @@ def store_chunks(state: KnowledgeState) -> KnowledgeState:
             state["status"] = "failed"
             return state
 
-        # Delete old chunks for idempotency
+        from app.services.rag.chroma_client import get_chroma_collection
+        collection = get_chroma_collection()
+
+        # Delete old chunks for idempotency from SQLite and ChromaDB
+        old_chunks = session.query(KnowledgeChunk).filter(
+            KnowledgeChunk.source_id == source.id
+        ).all()
+        
+        old_chunk_ids = [str(c.id) for c in old_chunks]
+        if old_chunk_ids:
+            try:
+                collection.delete(ids=old_chunk_ids)
+            except Exception as e:
+                logger.warning("Error deleting old chunks from ChromaDB: %s", e)
+                
         deleted = session.query(KnowledgeChunk).filter(
             KnowledgeChunk.source_id == source.id
         ).delete()
@@ -411,6 +425,11 @@ def store_chunks(state: KnowledgeState) -> KnowledgeState:
 
         # Store new chunks with embeddings (as JSON text for SQLite)
         stored_chunks = []
+        chroma_ids = []
+        chroma_embeddings = []
+        chroma_documents = []
+        chroma_metadatas = []
+        
         for i, (chunk_text, embedding) in enumerate(zip(chunks, embeddings)):
             # For SQLite, store embedding as JSON string
             embedding_value = json.dumps(embedding)
@@ -424,7 +443,29 @@ def store_chunks(state: KnowledgeState) -> KnowledgeState:
                 word_count=len(chunk_text.split())
             )
             session.add(chunk)
+            session.flush() # flush to generate chunk.id
             stored_chunks.append(chunk)
+            
+            chroma_ids.append(str(chunk.id))
+            chroma_embeddings.append(embedding)
+            chroma_documents.append(chunk_text)
+            chroma_metadatas.append({
+                "source_id": str(source.id),
+                "source_title": source.title,
+                "category": source.category.value if hasattr(source.category, 'value') else str(source.category),
+                "index": i
+            })
+            
+        if chroma_ids:
+            try:
+                collection.add(
+                    ids=chroma_ids,
+                    embeddings=chroma_embeddings,
+                    documents=chroma_documents,
+                    metadatas=chroma_metadatas
+                )
+            except Exception as e:
+                logger.warning("Error adding chunks to ChromaDB: %s", e)
 
         # Update source chunk count
         source.chunk_count = len(stored_chunks)

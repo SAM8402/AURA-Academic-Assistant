@@ -318,7 +318,7 @@ async def search_knowledge(
 ):
     """Search knowledge base directly."""
     try:
-        from app.services.rag.search_pipeline import semantic_search_sqlite
+        from app.services.rag.search_pipeline import semantic_search_chroma
         from app.services.rag.embedding_service import generate_embedding
         from app.models.enums import CategoryEnum
 
@@ -336,8 +336,7 @@ async def search_knowledge(
         if not query_embedding:
             return {"query": query, "results_count": 0, "results": [], "message": "Failed to generate embedding"}
 
-        results = semantic_search_sqlite(
-            session=db,
+        results = semantic_search_chroma(
             query_embedding=query_embedding,
             top_k=limit,
             filters={"category": category_enum} if category_enum else {},

@@ -355,7 +355,6 @@ class ToolExecutor:
 
     async def execute(self, tool_name: str, args: Dict[str, Any]) -> Dict[str, Any]:
         """Dispatch a tool call with retry and timeout protection."""
-        import asyncio
         import time
 
         handlers = {
@@ -374,19 +373,13 @@ class ToolExecutor:
         for attempt in range(self.MAX_RETRIES):
             try:
                 start = time.time()
-                # Run synchronous handler in executor with timeout
-                result = await asyncio.wait_for(
-                    asyncio.get_event_loop().run_in_executor(None, lambda: handler(**args)),
-                    timeout=self.TOOL_TIMEOUT_SECONDS,
-                )
+                # Run synchronous handler directly (NOT in thread pool)
+                # because handlers use self.db which is not thread-safe
+                result = handler(**args)
                 elapsed = round((time.time() - start) * 1000)
                 self._execution_times[tool_name] = elapsed
                 logger.info("Tool %s completed in %dms (attempt %d)", tool_name, elapsed, attempt + 1)
                 return result
-
-            except asyncio.TimeoutError:
-                logger.warning("Tool %s timed out (attempt %d/%d)", tool_name, attempt + 1, self.MAX_RETRIES)
-                last_error = f"Tool {tool_name} timed out after {self.TOOL_TIMEOUT_SECONDS}s"
 
             except Exception as e:
                 logger.warning("Tool %s failed (attempt %d/%d): %s", tool_name, attempt + 1, self.MAX_RETRIES, e)
@@ -456,37 +449,51 @@ class ToolExecutor:
             return {"results": [], "message": "Knowledge base search is disabled for this request"}
 
         try:
-            from app.services.rag.search_pipeline import semantic_search_sqlite
+            from config.db import SessionLocal
+            from app.services.rag.search_pipeline import semantic_search_chroma
             from app.services.rag.embedding_service import generate_embedding
 
             # Rewrite query for better search retrieval
             search_query = rewrite_query_for_rag(query)
+            logger.info("KB search: original='%s' rewritten='%s'", query[:60], search_query[:60])
+
             query_embedding = generate_embedding(search_query)
             if not query_embedding:
+                logger.warning("KB search: embedding generation failed for '%s'", search_query[:60])
                 return {"results": [], "message": "Failed to generate embedding for query"}
 
-            # Search with user-role-specific categories first
-            categories = self._get_user_categories()
-            all_results = []
+            logger.info("KB search: embedding generated (dim=%d)", len(query_embedding))
 
-            for category in categories:
-                results = semantic_search_sqlite(
-                    session=self.db, query_embedding=query_embedding, top_k=2,
-                    filters={"category": category} if category else {},
-                    similarity_threshold=RAG_SIMILARITY_THRESHOLD,
-                )
-                if results:
-                    all_results.extend(results)
+            # Use a FRESH session for KB reads — the API request session (self.db)
+            # can go stale inside async context, causing empty results.
+            kb_session = SessionLocal()
+            try:
+                # Search with user-role-specific categories first
+                categories = self._get_user_categories()
+                all_results = []
 
-            # Fallback: broad search if category-specific returned nothing
+                for category in categories:
+                    results = semantic_search_chroma(
+                        query_embedding=query_embedding, top_k=2,
+                        filters={"category": category} if category else {},
+                        similarity_threshold=RAG_SIMILARITY_THRESHOLD,
+                    )
+                    if results:
+                        all_results.extend(results)
+
+                # Fallback: broad search if category-specific returned nothing
+                if not all_results:
+                    logger.info("KB search: category search empty, trying broad search")
+                    all_results = semantic_search_chroma(
+                        query_embedding=query_embedding,
+                        top_k=RAG_TOP_K, filters={},
+                        similarity_threshold=RAG_SIMILARITY_THRESHOLD,
+                    )
+            finally:
+                kb_session.close()
+
             if not all_results:
-                all_results = semantic_search_sqlite(
-                    session=self.db, query_embedding=query_embedding,
-                    top_k=RAG_TOP_K, filters={},
-                    similarity_threshold=RAG_SIMILARITY_THRESHOLD,
-                )
-
-            if not all_results:
+                logger.info("KB search: no results found for '%s'", search_query[:60])
                 return {"results": [], "message": "No relevant content found in knowledge base"}
 
             # Sort by relevance and take top results
@@ -508,6 +515,8 @@ class ToolExecutor:
                 })
                 self._sources.append({"type": "knowledge", "title": title, "category": category})
 
+            logger.info("KB search: found %d results (top score=%.3f)", len(formatted), formatted[0]["relevance_score"] if formatted else 0)
+
             return {
                 "results": formatted,
                 "total_found": len(formatted),
@@ -517,7 +526,7 @@ class ToolExecutor:
         except ImportError:
             return {"results": [], "message": "RAG pipeline not available"}
         except Exception as e:
-            logger.warning("Knowledge base search failed: %s", e)
+            logger.warning("Knowledge base search failed: %s", e, exc_info=True)
             return {"results": [], "message": f"Search error: {str(e)}"}
 
     # -- Tool: Search Student Queries -----------------------------------------
