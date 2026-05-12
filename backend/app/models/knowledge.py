@@ -64,9 +64,9 @@ class KnowledgeChunk(Base):
     text = Column(Text, nullable=False)
     index = Column(Integer, nullable=False)  # Position in document
 
-    # Vector embedding (1536 dimensions for gemini-embedding-001)
+    # Vector embedding (768 dimensions for gemini-embedding-001)
     if PGVECTOR_AVAILABLE:
-        embedding = Column(Vector(1536))
+        embedding = Column(Vector(768))
     else:
         embedding = Column(Text)  # Fallback to text if pgvector not available
 

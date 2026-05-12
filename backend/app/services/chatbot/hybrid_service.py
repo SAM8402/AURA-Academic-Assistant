@@ -453,7 +453,6 @@ class ToolExecutor:
             from app.services.rag.search_pipeline import semantic_search_chroma
             from app.services.rag.embedding_service import generate_embedding
 
-            # Rewrite query for better search retrieval
             search_query = rewrite_query_for_rag(query)
             logger.info("KB search: original='%s' rewritten='%s'", query[:60], search_query[:60])
 
@@ -464,31 +463,15 @@ class ToolExecutor:
 
             logger.info("KB search: embedding generated (dim=%d)", len(query_embedding))
 
-            # Use a FRESH session for KB reads — the API request session (self.db)
-            # can go stale inside async context, causing empty results.
             kb_session = SessionLocal()
             try:
-                # Search with user-role-specific categories first
-                categories = self._get_user_categories()
-                all_results = []
-
-                for category in categories:
-                    results = semantic_search_chroma(
-                        query_embedding=query_embedding, top_k=2,
-                        filters={"category": category} if category else {},
-                        similarity_threshold=RAG_SIMILARITY_THRESHOLD,
-                    )
-                    if results:
-                        all_results.extend(results)
-
-                # Fallback: broad search if category-specific returned nothing
-                if not all_results:
-                    logger.info("KB search: category search empty, trying broad search")
-                    all_results = semantic_search_chroma(
-                        query_embedding=query_embedding,
-                        top_k=RAG_TOP_K, filters={},
-                        similarity_threshold=RAG_SIMILARITY_THRESHOLD,
-                    )
+                # Broad search across ALL documents — no category restriction
+                all_results = semantic_search_chroma(
+                    query_embedding=query_embedding,
+                    top_k=RAG_TOP_K,
+                    filters={},
+                    similarity_threshold=0.15,
+                )
             finally:
                 kb_session.close()
 
@@ -496,7 +479,6 @@ class ToolExecutor:
                 logger.info("KB search: no results found for '%s'", search_query[:60])
                 return {"results": [], "message": "No relevant content found in knowledge base"}
 
-            # Sort by relevance and take top results
             all_results.sort(key=lambda r: r.get("score", 0), reverse=True)
             top = all_results[:RAG_TOP_K]
 

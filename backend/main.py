@@ -67,6 +67,14 @@ async def lifespan(app: FastAPI):
     init_db()
     logger.info("Database initialized")
 
+    # Auto-ingest any files in uploads/knowledge/ that haven't been processed yet
+    try:
+        from app.services.rag.ingest_pipeline import auto_ingest_uploads
+        ingest_result = await auto_ingest_uploads()
+        logger.info("Auto-ingest result: %s", ingest_result)
+    except Exception as e:
+        logger.warning("Auto-ingest skipped (non-fatal): %s", e)
+
     yield
 
     # Shutdown: Cleanup (if needed)

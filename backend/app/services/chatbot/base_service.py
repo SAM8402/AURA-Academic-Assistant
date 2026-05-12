@@ -50,9 +50,9 @@ MAX_PERSISTENT_SESSIONS = 5
 CHATBOT_TEMPERATURE = 0.7
 CHATBOT_MAX_TOKENS = 1024
 
-# Retrieval (used by tools)
-RAG_TOP_K = 5
-RAG_SIMILARITY_THRESHOLD = 0.3
+# Retrieval (used by tools) — lower threshold for broader document matching
+RAG_TOP_K = 8
+RAG_SIMILARITY_THRESHOLD = 0.2
 WEB_SEARCH_MAX_RESULTS = 3
 DB_QUERY_MATCH_LIMIT = 3
 KEYWORD_MIN_LENGTH = 4
@@ -172,22 +172,24 @@ Your identity:
 - You admit uncertainty honestly rather than guessing
 - You keep responses focused and well-organized
 
-Tool usage guidelines:
-- For course-specific or academic questions → use search_knowledge_base
-- When the student references their queries or doubts → use search_student_queries
-- If they want to see all their queries or check status → use list_all_queries
+TOOL USAGE — CRITICAL INSTRUCTION:
+- For ANY academic or course-related question → ALWAYS call search_knowledge_base first
+- The knowledge base contains uploaded course documents — your answer MUST be grounded in these
+- If search_knowledge_base returns results, you MUST base your answer on them
+- Only after search_knowledge_base returns NO results should you try other tools or your own knowledge
+- When the student references queries/doubts → use search_student_queries
 - For course enrollment, quizzes, scores, or resources → use get_course_info
 - For current events or information you're unsure about → use search_web
 - For simple greetings, follow-ups, or general knowledge → answer directly without tools
 - You may call multiple tools if the question spans several topics
-- If a tool returns no results, try a different tool or answer from your knowledge
 
-Citation and response guidelines:
-- When citing knowledge base content, mention the source title: e.g. "According to *DSA Notes*..."
+CITATION AND RESPONSE GUIDELINES:
+- When citing knowledge base content, use the EXACT source title as provided (e.g. "According to *Ml Intro*..."). Do NOT rename or paraphrase the title.
+- If you used the knowledge base, start your answer with a reference to the exact source document
 - When referencing a student query, mention its title and status
 - Structure longer responses with markdown headings (##), bullet points, and code blocks
 - End with a follow-up suggestion when appropriate: "Would you like me to explain X further?"
-- If your answer is based entirely on your training data (no tools used), say so briefly"""
+- If your answer is based entirely on your training data (no tools used), say so clearly"""
 
 
 MODE_INSTRUCTIONS: Dict[ChatMode, str] = {
@@ -747,9 +749,8 @@ class ChatOrchestrator:
             user_context = tool_executor.get_user_context()
             persistent_summaries = self.memory.load_persistent_summaries(db, user)
 
-            # 3. PRE-FETCH KB context (Nexora pattern) — always search the
-            #    knowledge base up front so the LLM has relevant context even
-            #    if the model doesn't call the search_knowledge_base tool.
+            # 3. PRE-FETCH KB context — aggressively search the
+            #    knowledge base up front so the LLM always has document context.
             kb_context_text = ""
             kb_sources: List[Dict[str, Any]] = []
             if use_knowledge_base:
@@ -766,18 +767,18 @@ class ChatOrchestrator:
                         try:
                             kb_results = semantic_search_chroma(
                                 query_embedding=query_embedding,
-                                top_k=5,
+                                top_k=10,
                                 filters={},
-                                similarity_threshold=0.3,
+                                similarity_threshold=0.15,
                             )
                         finally:
                             kb_session.close()
 
                         if kb_results:
                             parts = []
-                            for r in kb_results[:5]:
+                            for r in kb_results[:8]:
                                 title = r.get("source_title", "Unknown")
-                                content = r.get("content", "")[:600]
+                                content = r.get("content", "")[:800]
                                 score = r.get("score", 0)
                                 parts.append(f"[Source: {title} | relevance: {score:.2f}]\n{content}")
                                 kb_sources.append({"type": "knowledge", "title": title, "category": r.get("source_category", "")})
@@ -793,16 +794,20 @@ class ChatOrchestrator:
                 previous_summaries=persistent_summaries or None,
             )
 
-            # Inject KB context into the prompt so LLM always has it
+            # Inject KB context into the prompt with emphatic grounding instruction
             if kb_context_text:
                 composed_prompt = (
                     f"{composed_prompt}\n\n"
-                    f"--- KNOWLEDGE BASE RESULTS ---\n"
-                    f"The following content was found in the academic knowledge base. "
-                    f"Use this information to answer the question accurately. "
-                    f"Cite the source titles when referencing this content.\n\n"
-                    f"{kb_context_text}\n"
-                    f"--- END KNOWLEDGE BASE RESULTS ---"
+                    f"==================================================\n"
+                    f"CRITICAL — YOU MUST USE THIS CONTENT TO ANSWER\n"
+                    f"==================================================\n"
+                    f"The following content was retrieved from the uploaded course "
+                    f"documents. Your answer MUST be based on this information. "
+                    f"Do NOT ignore or contradict it. Cite the EXACT source title as shown in [Source: ...].\n\n"
+                    f"{kb_context_text}\n\n"
+                    f"==================================================\n"
+                    f"END OF UPLOADED DOCUMENT CONTENT\n"
+                    f"=================================================="
                 )
 
             # 5. Agentic generation — use the mode the frontend requested

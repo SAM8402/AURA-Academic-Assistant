@@ -423,7 +423,8 @@ def store_chunks(state: KnowledgeState) -> KnowledgeState:
         session.commit()
         logger.info("Deleted %d old chunks for source %s", deleted, source.id)
 
-        # Store new chunks with embeddings (as JSON text for SQLite)
+        # Store new chunks — use list for pgvector Vector type, JSON string for SQLite Text
+        from app.models.knowledge import PGVECTOR_AVAILABLE
         stored_chunks = []
         chroma_ids = []
         chroma_embeddings = []
@@ -431,8 +432,10 @@ def store_chunks(state: KnowledgeState) -> KnowledgeState:
         chroma_metadatas = []
         
         for i, (chunk_text, embedding) in enumerate(zip(chunks, embeddings)):
-            # For SQLite, store embedding as JSON string
-            embedding_value = json.dumps(embedding)
+            if PGVECTOR_AVAILABLE:
+                embedding_value = embedding
+            else:
+                embedding_value = json.dumps(embedding)
 
             chunk = KnowledgeChunk(
                 source_id=source.id,
@@ -569,6 +572,112 @@ def build_knowledge_graph():
 # ============================================================================
 # PIPELINE EXECUTION
 # ============================================================================
+
+# ============================================================================
+# AUTO-INGESTION: Scan uploads/ for unprocessed files
+# ============================================================================
+
+import os as _os
+import asyncio
+from app.services.rag.file_extractor import SUPPORTED_EXTENSIONS, UPLOADS_DIR
+
+_UPLOAD_KNOWLEDGE_DIR = _os.path.join(UPLOADS_DIR, "knowledge")
+
+
+async def auto_ingest_uploads() -> Dict[str, Any]:
+    """
+    Scan uploads/knowledge/ for files that have NOT been ingested yet,
+    create KnowledgeSource records and run the embedding pipeline.
+
+    Called on server startup so any file dropped into the folder is
+    automatically searchable via the RAG chatbot.
+    """
+    session: Session = SessionLocal()
+    try:
+        if not _os.path.isdir(_UPLOAD_KNOWLEDGE_DIR):
+            logger.info("No uploads/knowledge/ directory found — skipping auto-ingest")
+            return {"ingested": 0, "skipped": 0, "errors": 0}
+
+        from app.models.knowledge import KnowledgeSource
+        from app.models.enums import CategoryEnum
+
+        pending_files = []
+        for fname in _os.listdir(_UPLOAD_KNOWLEDGE_DIR):
+            ext = _os.path.splitext(fname)[1].lower()
+            if ext not in SUPPORTED_EXTENSIONS:
+                continue
+
+            abs_path = _os.path.abspath(_os.path.join(_UPLOAD_KNOWLEDGE_DIR, fname))
+            if not _os.path.isfile(abs_path):
+                continue
+
+            existing = session.query(KnowledgeSource).filter(
+                KnowledgeSource.file_path == abs_path
+            ).first()
+            if existing:
+                logger.debug("Already ingested: %s", fname)
+                continue
+
+            pending_files.append((fname, abs_path))
+
+        if not pending_files:
+            logger.info("No new files to ingest in uploads/knowledge/")
+            return {"ingested": 0, "skipped": 0, "errors": 0}
+
+        logger.info("Found %d unprocessed file(s) — starting auto-ingest", len(pending_files))
+
+        cat_enum = CategoryEnum.COURSES
+        results = {"ingested": 0, "skipped": 0, "errors": 0}
+
+        for fname, abs_path in pending_files:
+            try:
+                raw_title = _os.path.splitext(fname)[0].replace("_", " ").replace("-", " ")
+                title = " ".join(w.upper() if w.isupper() and len(w) <= 4 else w.capitalize() for w in raw_title.split())
+
+                source = KnowledgeSource(
+                    title=title,
+                    description=f"Auto-ingested from {fname}",
+                    content="[Pending file extraction]",
+                    file_path=abs_path,
+                    category=cat_enum,
+                    is_active=True,
+                )
+                session.add(source)
+                session.commit()
+                session.refresh(source)
+
+                source_id = str(source.id)
+                logger.info("Auto-ingested %s → KnowledgeSource %s", fname, source_id)
+
+                try:
+                    result = await process_knowledge_source(source_id)
+
+                    if result.get("success"):
+                        results["ingested"] += 1
+                        logger.info("Embedded %s: %d chunks", fname, result.get("chunks_created", 0))
+                    else:
+                        results["errors"] += 1
+                        logger.error("Embedding failed for %s: %s", fname, result.get("error"))
+                except Exception as e:
+                    results["errors"] += 1
+                    logger.error("Embedding pipeline error for %s: %s", fname, e)
+
+            except Exception as e:
+                results["errors"] += 1
+                logger.error("Failed to auto-ingest %s: %s", fname, e)
+
+        logger.info(
+            "Auto-ingest complete: %d ingested, %d errors",
+            results["ingested"], results["errors"]
+        )
+        return results
+
+    except Exception as e:
+        logger.error("Auto-ingest failed: %s", e)
+        return {"ingested": 0, "skipped": 0, "errors": 1}
+    finally:
+        session.close()
+
 
 async def process_knowledge_source(
     source_id: str,

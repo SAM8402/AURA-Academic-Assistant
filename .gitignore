@@ -372,3 +372,11 @@ dist-ssr
 
 uploads
 uploads/*
+*.bin
+*.json
+*.png
+*sqlite3
+
+! README.md
+! LICENSE
+*.md
