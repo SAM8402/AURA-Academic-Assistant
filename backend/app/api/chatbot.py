@@ -10,6 +10,7 @@ Endpoints:
   POST /chat/enhanced           - RAG-enhanced chat with knowledge base
   POST /chat/enhanced/stream    - Streaming RAG-enhanced chat
   POST /chat/rag                - Direct RAG pipeline chat
+  POST /chat/rag/stream         - Streaming direct RAG pipeline chat
   GET  /chat/search-knowledge   - Search knowledge base directly
   POST /chat/answer-query/{id}  - AI-answer a specific query
   GET  /chat/status             - Service health check
@@ -237,13 +238,14 @@ async def chat_enhanced_stream(
                 use_knowledge_base=request.use_knowledge_base,
             ):
                 yield f"data: {chunk}\n\n"
+            yield "data: [DONE]\n\n"
         except Exception as e:
             yield f"data: Error: {str(e)}\n\n"
 
     return StreamingResponse(
         generate(),
         media_type="text/event-stream",
-        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no", "Connection": "keep-alive"},
     )
 
 
@@ -298,6 +300,52 @@ async def chat_rag(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"RAG chat failed: {str(e)}",
         )
+
+
+@chatbot_router.post(
+    "/chat/rag/stream",
+    summary="Streaming RAG-powered chat",
+    description="Stream a RAG-powered response (embedding → search → stream generation).",
+)
+async def chat_rag_stream(
+    request: RAGChatRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Streaming RAG-powered chat endpoint."""
+    try:
+        from app.services.rag.chat_pipeline import stream_chat_with_rag
+
+        user_name = current_user.full_name if hasattr(current_user, "full_name") else "Student"
+        user_role = current_user.role.value if hasattr(current_user.role, "value") else "student"
+
+        return StreamingResponse(
+            stream_chat_with_rag(
+                query=request.message,
+                user_name=user_name,
+                user_role=user_role,
+                conversation_id=request.conversation_id,
+            ),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            },
+        )
+
+    except ImportError:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="RAG pipeline dependencies not available",
+        )
+    except Exception as e:
+        logger.error("RAG stream error: %s", e, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"RAG stream failed: {str(e)}",
+        )
+
 
 
 # =============================================================================

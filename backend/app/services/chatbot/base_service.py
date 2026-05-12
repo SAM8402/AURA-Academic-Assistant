@@ -884,106 +884,158 @@ class ChatOrchestrator:
         Strategy: run the tool-calling loop first (non-streaming), then
         stream the final response. This gives the agent full tool access
         while still providing a streaming UX for the final answer.
+
+        On 429/503/quota errors, automatically rotates to the next
+        (model, key) combo and retries.
         """
         from app.services.chatbot.hybrid_service import ToolExecutor, TOOL_DECLARATIONS
 
         conv_id = conversation_id or self.memory.generate_conversation_id()
 
-        try:
-            tool_executor = ToolExecutor(db=db, user=user, use_kb=use_knowledge_base)
-            user_context = tool_executor.get_user_context()
-            persistent_summaries = self.memory.load_persistent_summaries(db, user)
+        if not self.llm.is_available:
+            yield "Chat service is not configured. Please check GOOGLE_API_KEY."
+            return
 
-            composed_prompt = build_agentic_prompt(
-                user_message=message,
-                user_context=user_context,
-                previous_summaries=persistent_summaries or None,
-            )
+        # Retry across model/key combos on exhaustion errors
+        max_attempts = len(self.llm._combos) if self.llm._combos else 1
 
-            system_prompt = get_system_prompt(ChatMode.ACADEMIC)
-            history = self.memory.get_session_history(conv_id)
+        for attempt in range(max_attempts):
+            try:
+                tool_executor = ToolExecutor(db=db, user=user, use_kb=use_knowledge_base)
+                user_context = tool_executor.get_user_context()
+                persistent_summaries = self.memory.load_persistent_summaries(db, user)
 
-            # Run the agentic tool-calling loop (non-streaming)
-            # then collect tool context and stream the final answer
-            gemini_tools = [types.Tool(function_declarations=TOOL_DECLARATIONS)]
-            config_with_tools = types.GenerateContentConfig(
-                temperature=CHATBOT_TEMPERATURE,
-                max_output_tokens=CHATBOT_MAX_TOKENS,
-                system_instruction=system_prompt,
-                tools=gemini_tools,
-            )
-
-            contents = list(history)
-            contents.append({"role": "user", "parts": [{"text": composed_prompt}]})
-
-            # Tool-calling rounds (non-streaming)
-            for _ in range(MAX_TOOL_ROUNDS):
-                response = await self.llm.client.aio.models.generate_content(
-                    model=self.llm.model,
-                    contents=contents,
-                    config=config_with_tools,
+                composed_prompt = build_agentic_prompt(
+                    user_message=message,
+                    user_context=user_context,
+                    previous_summaries=persistent_summaries or None,
                 )
 
-                response_content = response.candidates[0].content
-                function_calls = [
-                    p for p in response_content.parts
-                    if hasattr(p, "function_call") and p.function_call
-                ]
+                system_prompt = get_system_prompt(ChatMode.ACADEMIC)
+                history = self.memory.get_session_history(conv_id)
 
-                if not function_calls:
-                    # No more tool calls — stream the text from this response
-                    text = response.text if hasattr(response, "text") else ""
-                    if text:
-                        yield text
-                    self.memory.add_turn(conv_id, message, text)
+                # Run the agentic tool-calling loop (non-streaming)
+                # then collect tool context and stream the final answer
+                gemini_tools = [types.Tool(function_declarations=TOOL_DECLARATIONS)]
+                config_with_tools = types.GenerateContentConfig(
+                    temperature=CHATBOT_TEMPERATURE,
+                    max_output_tokens=CHATBOT_MAX_TOKENS,
+                    system_instruction=system_prompt,
+                    tools=gemini_tools,
+                )
+
+                contents = list(history)
+                contents.append({"role": "user", "parts": [{"text": composed_prompt}]})
+
+                # Tool-calling rounds (non-streaming)
+                # Emit status events so the frontend shows progress
+                yield "__STATUS__Analyzing your question..."
+                tool_loop_had_text = False
+                final_text = ""
+
+                for round_num in range(MAX_TOOL_ROUNDS):
+                    response = await self.llm.client.aio.models.generate_content(
+                        model=self.llm.model,
+                        contents=contents,
+                        config=config_with_tools,
+                    )
+
+                    response_content = response.candidates[0].content
+                    function_calls = [
+                        p for p in response_content.parts
+                        if hasattr(p, "function_call") and p.function_call
+                    ]
+
+                    if not function_calls:
+                        # Tool loop done — use the already-generated text
+                        final_text = response.text if hasattr(response, "text") else ""
+                        tool_loop_had_text = True
+                        break
+
+                    # Emit status for each tool being called
+                    for part in function_calls:
+                        tool_name = part.function_call.name
+                        status_map = {
+                            "search_knowledge_base": "Searching knowledge base...",
+                            "search_student_queries": "Checking related queries...",
+                            "get_academic_calendar": "Fetching academic calendar...",
+                            "get_student_progress": "Loading your progress...",
+                        }
+                        status_msg = status_map.get(tool_name, f"Running {tool_name}...")
+                        yield f"__STATUS__{status_msg}"
+
+                    # Execute tools
+                    contents.append(response_content)
+                    fn_parts = []
+                    for part in function_calls:
+                        result = await tool_executor.execute(
+                            part.function_call.name,
+                            dict(part.function_call.args) if part.function_call.args else {},
+                        )
+                        fn_parts.append(
+                            types.Part.from_function_response(
+                                name=part.function_call.name,
+                                response=result if isinstance(result, dict) else {"result": str(result)},
+                            )
+                        )
+                    contents.append(types.Content(role="user", parts=fn_parts))
+                    yield "__STATUS__Generating response..."
+
+                if tool_loop_had_text and final_text:
+                    # Yield the already-generated text in word-group chunks
+                    # (no redundant second API call — halves response time)
+                    import asyncio
+                    words = final_text.split(' ')
+                    for i in range(0, len(words), 3):  # 3 words per chunk
+                        chunk = ' '.join(words[i:i+3])
+                        if i > 0:
+                            chunk = ' ' + chunk
+                        yield chunk
+                        await asyncio.sleep(0.01)  # tiny yield to allow flush
+
+                    self.memory.add_turn(conv_id, message, final_text)
                     self.memory.save_session(
                         db=db, user=user, conversation_id=conv_id,
-                        user_message=message, assistant_response=text,
+                        user_message=message, assistant_response=final_text,
                     )
-                    return
-
-                # Execute tools
-                contents.append(response_content)
-                fn_parts = []
-                for part in function_calls:
-                    result = await tool_executor.execute(
-                        part.function_call.name,
-                        dict(part.function_call.args) if part.function_call.args else {},
+                else:
+                    # Max rounds exhausted or no text — stream via API
+                    config_no_tools = types.GenerateContentConfig(
+                        temperature=CHATBOT_TEMPERATURE,
+                        max_output_tokens=CHATBOT_MAX_TOKENS,
+                        system_instruction=system_prompt,
                     )
-                    fn_parts.append(
-                        types.Part.from_function_response(
-                            name=part.function_call.name,
-                            response=result if isinstance(result, dict) else {"result": str(result)},
-                        )
+
+                    full_response = ""
+                    async for chunk in await self.llm.client.aio.models.generate_content_stream(
+                        model=self.llm.model,
+                        contents=contents,
+                        config=config_no_tools,
+                    ):
+                        if hasattr(chunk, "text") and chunk.text:
+                            full_response += chunk.text
+                            yield chunk.text
+
+                    self.memory.add_turn(conv_id, message, full_response)
+                    self.memory.save_session(
+                        db=db, user=user, conversation_id=conv_id,
+                        user_message=message, assistant_response=full_response,
                     )
-                contents.append(types.Content(role="user", parts=fn_parts))
 
-            # Max rounds exhausted — stream the final response without tools
-            config_no_tools = types.GenerateContentConfig(
-                temperature=CHATBOT_TEMPERATURE,
-                max_output_tokens=CHATBOT_MAX_TOKENS,
-                system_instruction=system_prompt,
-            )
+                return  # Success — exit retry loop
 
-            full_response = ""
-            async for chunk in await self.llm.client.aio.models.generate_content_stream(
-                model=self.llm.model,
-                contents=contents,
-                config=config_no_tools,
-            ):
-                if hasattr(chunk, "text") and chunk.text:
-                    full_response += chunk.text
-                    yield chunk.text
+            except Exception as e:
+                if self.llm._is_exhaustion_error(e) and attempt < max_attempts - 1:
+                    logger.warning(
+                        "Streaming: model/key exhausted (%s: %s), rotating... (attempt %d/%d)",
+                        self.llm.model, str(e)[:80], attempt + 1, max_attempts,
+                    )
+                    self.llm._rotate()
+                    continue  # Retry with next combo
 
-            self.memory.add_turn(conv_id, message, full_response)
-            self.memory.save_session(
-                db=db, user=user, conversation_id=conv_id,
-                user_message=message, assistant_response=full_response,
-            )
-
-        except Exception as e:
-            logger.error("Streaming agentic chat failed: %s", e)
-            yield f"I apologize, but I encountered an error. Please try again."
+                logger.error("Streaming agentic chat failed: %s", e)
+                yield "I apologize, but I encountered an error. Please try again."
+                return
 
     # -------------------------------------------------------------------------
     # Query-Specific

@@ -1,6 +1,6 @@
 <template>
   <footer
-    class="fixed bottom-0 left-[250px] w-[calc(100%-250px-320px)] z-[100] px-6 py-4 border-t"
+    class="fixed bottom-0 left-[250px] right-80 z-[100] px-6 py-4 border-t"
     :style="{ background: 'var(--bg-primary)', borderColor: 'var(--border-default)' }"
   >
     <div class="flex items-end justify-center gap-3 w-full max-w-xl mx-auto">

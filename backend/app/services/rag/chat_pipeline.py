@@ -28,6 +28,8 @@ except ImportError:
     _LANGCHAIN_AVAILABLE = False
     ChatGoogleGenerativeAI = None
 
+from app.services.rag.llm_builder import build_robust_llm
+
 from config.db import SessionLocal
 from config.settings import settings
 from app.services.rag.embedding_service import generate_embedding
@@ -35,7 +37,7 @@ from app.services.rag.search_pipeline import semantic_search_chroma
 
 logger = logging.getLogger(__name__)
 
-# Configuration — models are handled by _build_rag_llm() with multi-model fallback
+# Configuration — models are handled by build_robust_llm() from llm_builder.py
 SIMILARITY_THRESHOLD = 0.35
 DEFAULT_TOP_K = 5
 TIMEOUT_SECONDS = 30
@@ -77,48 +79,18 @@ class ChatRAGState(TypedDict, total=False):
 def _build_rag_llm():
     """
     Build RAG LLM with multi-model fallback chain.
-    
-    Implements robust model selection by:
-    1. Extracting comma-separated API keys from settings
-    2. Creating LLM instances for each model × API key combination
-    3. Chaining fallbacks: if one fails, automatically try the next
-    
-    Models are ordered by priority/speed:
-    - Primary: gemini-3.0-flash (fastest, most reliable)
-    - Secondary: gemini-3.1-flash-lite (alternative fast model)
-    - Tertiary: gemini-2.5-flash (stable backup)
-    - Fallback: gemma-3-27b-it (open model as last resort)
-    
+
+    Delegates to build_robust_llm() from llm_builder.py, which reads
+    the model list from settings.LLM_FALLBACK_CHAIN (.env).
+    Uses low temperature (0.1) for factual RAG responses.
+
     Returns: LangChain ChatGoogleGenerativeAI with fallback chain
     """
-    api_keys = [k.strip() for k in settings.GOOGLE_API_KEY.split(",") if k.strip()]
-    if not api_keys:
-        api_keys = [""]
-
-    # Model priority order: fast & reliable → stable → open-source
-    models = [
-        "gemini-3.0-flash",           # Primary: fastest, best for RAG
-        "gemini-3.1-flash-lite",      # Secondary: solid alternative
-        "gemini-2.5-flash",           # Tertiary: proven stable
-        "gemma-3-27b-it"              # Fallback: open-source option
-    ]
-    llms = []
-
-    for model_name in models:
-        for key in api_keys:
-            llms.append(
-                ChatGoogleGenerativeAI(
-                    model=model_name,
-                    google_api_key=key,
-                    temperature=0.1,
-                    max_retries=1,
-                )
-            )
-
-    if not llms:
-        raise ValueError("No LLM instances created. Check GOOGLE_API_KEY configuration.")
-    
-    return llms[0].with_fallbacks(llms[1:])
+    llm, models = build_robust_llm(temperature=0.1, max_retries=1)
+    if llm is None:
+        raise ValueError("No LLM instances created. Check GOOGLE_API_KEY and LLM_FALLBACK_CHAIN.")
+    logger.info("RAG LLM built with %d models from LLM_FALLBACK_CHAIN", len(models))
+    return llm
 
 
 def call_gemini_llm(prompt: str, context: str) -> Dict[str, Any]:
@@ -448,3 +420,158 @@ async def chat_with_rag(
             "similarity_score": 0.0,
             "error": str(e)
         }
+
+
+async def stream_chat_with_rag(
+    query: str,
+    user_name: Optional[str] = None,
+    user_role: Optional[str] = None,
+    conversation_id: Optional[str] = None,
+):
+    """
+    Streaming version of RAG chat pipeline.
+
+    Runs the retrieval pipeline (validate → embed → search) synchronously,
+    then streams the LLM response token-by-token.
+
+    Yields SSE-formatted strings:
+      - "data: <text_chunk>"   for each token
+      - "data: __RAG_META__<json>"  for metadata (sources, confidence)
+      - "data: __RAG_DONE__"  when complete
+
+    This pairs with the frontend sendRAGChatMessageStream consumer.
+    """
+    import json
+
+    if not _LANGCHAIN_AVAILABLE:
+        yield "data: RAG pipeline dependencies not available.\n\n"
+        yield "data: __RAG_DONE__\n\n"
+        return
+
+    if not settings.GOOGLE_API_KEY or settings.GOOGLE_API_KEY == "your-google-api-key":
+        yield "data: API key not configured. Please set GOOGLE_API_KEY.\n\n"
+        yield "data: __RAG_DONE__\n\n"
+        return
+
+    try:
+        # --- Step 1: Validate input ---
+        if not query or len(query.strip()) == 0:
+            yield "data: Please provide a valid question.\n\n"
+            yield "data: __RAG_DONE__\n\n"
+            return
+
+        if len(query.split()) < 2:
+            yield "data: Please provide a more detailed question.\n\n"
+            yield "data: __RAG_DONE__\n\n"
+            return
+
+        # --- Step 2: Generate embedding ---
+        logger.info("RAG stream: generating embedding for '%s'", query[:50])
+        query_embedding = generate_embedding(query)
+        if not query_embedding:
+            yield "data: Failed to generate query embedding. Please try again.\n\n"
+            yield "data: __RAG_DONE__\n\n"
+            return
+
+        # --- Step 3: Search knowledge base ---
+        session = SessionLocal()
+        try:
+            search_results = semantic_search_chroma(
+                query_embedding=query_embedding,
+                top_k=DEFAULT_TOP_K,
+                filters={},
+            )
+        finally:
+            session.close()
+
+        if search_results is None:
+            search_results = []
+
+        # Filter by similarity threshold
+        relevant_chunks = []
+        max_similarity = 0.0
+        for result in search_results:
+            score = result.get("score", 0.0)
+            if score >= SIMILARITY_THRESHOLD:
+                relevant_chunks.append(result)
+                max_similarity = max(max_similarity, score)
+
+        has_relevant_context = len(relevant_chunks) > 0
+        logger.info(
+            "RAG stream: %d relevant chunks (max score=%.3f)",
+            len(relevant_chunks), max_similarity,
+        )
+
+        # --- Step 4: Build context + prompt ---
+        if not has_relevant_context:
+            context = "No specific information found in the knowledge base for this query."
+        else:
+            context_parts = []
+            for chunk in relevant_chunks[:3]:
+                source_title = chunk.get("source_title", "Unknown Source")
+                content = chunk.get("content", "")
+                score = chunk.get("score", 0.0)
+                if content:
+                    context_parts.append(
+                        f"Source: {source_title} (relevance: {score:.2f})\n"
+                        f"Content: {content}"
+                    )
+            context = "\n\n".join(context_parts)
+
+        # Build sources metadata
+        sources = []
+        for chunk in relevant_chunks[:3]:
+            sources.append({
+                "title": chunk.get("source_title", "Unknown"),
+                "category": chunk.get("source_category", "Unknown"),
+                "score": str(round(chunk.get("score", 0.0), 3)),
+            })
+
+        full_prompt = f"""You are AURA (Academic Unified Response Assistant), an AI assistant for students.
+Provide helpful, accurate, and concise answers based on the context provided.
+
+Context from Knowledge Base:
+{context}
+
+Student Question: {query}
+
+Instructions:
+1. Answer based on the provided context when available
+2. If the context doesn't contain relevant information, say so clearly but still try to help
+3. Be concise but comprehensive
+4. Use a helpful, encouraging, and educational tone
+5. Format your response clearly with markdown when appropriate
+6. If referencing specific sources, mention them
+
+Response:"""
+
+        # --- Step 5: Stream LLM response ---
+        llm = _build_rag_llm()
+        full_response = ""
+
+        async for chunk in llm.astream(full_prompt):
+            token = chunk.content if hasattr(chunk, "content") else str(chunk)
+            if token:
+                full_response += token
+                yield f"data: {token}\n\n"
+
+        # --- Step 6: Emit metadata ---
+        confidence = _calculate_confidence(full_response, context)
+        meta = {
+            "sources": sources,
+            "confidence": confidence,
+            "has_relevant_context": has_relevant_context,
+            "similarity_score": round(max_similarity, 3),
+        }
+        yield f"data: __RAG_META__{json.dumps(meta)}\n\n"
+        yield "data: __RAG_DONE__\n\n"
+
+        logger.info(
+            "RAG stream complete: %d chars, confidence=%.2f, sources=%d",
+            len(full_response), confidence, len(sources),
+        )
+
+    except Exception as e:
+        logger.error("RAG streaming failed: %s", e, exc_info=True)
+        yield f"data: I'm sorry, I encountered an error. Please try again.\n\n"
+        yield "data: __RAG_DONE__\n\n"

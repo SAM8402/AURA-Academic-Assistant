@@ -6,7 +6,7 @@ import BottomBar from '@/components/layout/StudentLayout/BottomBar.vue'
 import ChatBubble from '@/components/shared/ChatBubble.vue'
 import LoadingSpinner from '@/components/shared/LoadingSpinner.vue'
 import EmptyState from '@/components/shared/EmptyState.vue'
-import { sendEnhancedChatMessage, getChatbotStatus } from '@/api/chatbot'
+import { sendEnhancedChatMessage, sendEnhancedChatMessageStream, sendRAGChatMessageStream, getChatbotStatus } from '@/api/chatbot'
 
 // State
 const messages = ref([])
@@ -16,8 +16,38 @@ const conversationId = ref(null)
 const chatMode = ref('academic')
 const chatMessagesContainer = ref(null)
 const isChatbotAvailable = ref(true)
+const useDirectRag = ref(false)
+const totalKbSourcesUsed = ref(0)
+const latestSources = ref([])
 
 const themeStore = useThemeStore()
+
+// Typewriter effect — buffers chunks and renders char-by-char
+const _typewriterQueue = ref('')
+let _typewriterTimer = null
+const CHAR_DELAY_MS = 30 // ms per character (~33 chars/sec, smooth typing feel)
+
+function startTypewriter(messageIndex) {
+  if (_typewriterTimer) return // already running
+  _typewriterTimer = setInterval(() => {
+    if (_typewriterQueue.value.length > 0) {
+      messages.value[messageIndex].content += _typewriterQueue.value.charAt(0)
+      _typewriterQueue.value = _typewriterQueue.value.slice(1)
+      scrollToBottom()
+    }
+  }, CHAR_DELAY_MS)
+}
+
+function stopTypewriter(messageIndex) {
+  clearInterval(_typewriterTimer)
+  _typewriterTimer = null
+  // Flush remaining buffer immediately
+  if (_typewriterQueue.value.length > 0) {
+    messages.value[messageIndex].content += _typewriterQueue.value
+    _typewriterQueue.value = ''
+    scrollToBottom()
+  }
+}
 
 // Suggested prompts
 const suggestedPrompts = [
@@ -63,44 +93,105 @@ const sendMessage = async () => {
   const loadingMessageIndex = messages.value.length
   messages.value.push({
     type: 'assistant',
-    content: 'Thinking...',
+    content: 'Analyzing your question...',
     isLoading: true,
     timestamp: new Date()
   })
 
-  try {
-    const response = await sendEnhancedChatMessage({
+  let streamError = null
+  let receivedFirstContent = false
+  _typewriterQueue.value = '' // Reset queue
+
+  // Handler for incoming chunks — filters status events from content
+  const handleChunk = (chunk) => {
+    // Status events update the loading indicator
+    if (chunk.startsWith('__STATUS__')) {
+      const statusText = chunk.slice('__STATUS__'.length)
+      if (!receivedFirstContent) {
+        messages.value[loadingMessageIndex].content = statusText
+      }
+      return
+    }
+
+    // First real content — swap loading message for streaming response
+    if (!receivedFirstContent) {
+      receivedFirstContent = true
+      messages.value[loadingMessageIndex] = {
+        type: 'assistant',
+        content: '',
+        timestamp: new Date()
+      }
+      startTypewriter(loadingMessageIndex)
+    }
+
+    _typewriterQueue.value += chunk
+  }
+
+  if (useDirectRag.value) {
+    startTypewriter(loadingMessageIndex)
+    // For RAG, swap loading immediately (no status events from RAG pipeline)
+    messages.value[loadingMessageIndex] = {
+      type: 'assistant',
+      content: '',
+      timestamp: new Date()
+    }
+    receivedFirstContent = true
+
+    await sendRAGChatMessageStream({
+      message: messageText,
+      conversation_id: conversationId.value,
+      onChunk: (chunk) => {
+        _typewriterQueue.value += chunk
+      },
+      onMeta: (meta) => {
+        if (meta.sources) {
+          latestSources.value = meta.sources
+          totalKbSourcesUsed.value = meta.sources.length
+        }
+      },
+      onDone: () => {
+        stopTypewriter(loadingMessageIndex)
+        if (!conversationId.value) {
+          conversationId.value = `rag-${Date.now().toString(36)}`
+        }
+      },
+      onError: (error) => {
+        stopTypewriter(loadingMessageIndex)
+        streamError = error
+      }
+    })
+  } else {
+    await sendEnhancedChatMessageStream({
       message: messageText,
       mode: chatMode.value,
       conversation_id: conversationId.value,
-      use_knowledge_base: true
+      use_knowledge_base: true,
+      onChunk: handleChunk,
+      onDone: () => {
+        stopTypewriter(loadingMessageIndex)
+        if (!conversationId.value) {
+          conversationId.value = `conv-${Date.now().toString(36)}`
+        }
+      },
+      onError: (error) => {
+        stopTypewriter(loadingMessageIndex)
+        streamError = error
+      }
     })
+  }
 
-    if (response.conversation_id) {
-      conversationId.value = response.conversation_id
-    }
-
-    messages.value[loadingMessageIndex] = {
-      type: 'assistant',
-      content: response.answer || 'I received your message but could not generate a response.',
-      timestamp: new Date(),
-      sources: response.sources || [],
-      knowledgeSourcesUsed: response.knowledge_sources_used || 0
-    }
-
-  } catch (error) {
-    console.error('Failed to send message:', error)
+  if (streamError) {
     messages.value[loadingMessageIndex] = {
       type: 'assistant',
       content: 'Sorry, I encountered an error. Please try again.',
       isError: true,
       timestamp: new Date()
     }
-  } finally {
-    isLoading.value = false
-    await nextTick()
-    scrollToBottom()
   }
+
+  isLoading.value = false
+  await nextTick()
+  scrollToBottom()
 }
 
 const useSuggestedPrompt = (prompt) => {
@@ -123,11 +214,13 @@ const handleKeyDown = (event) => {
 
 const clearChat = () => {
   messages.value = [{
-    type: 'assistant',
-    content: 'Conversation cleared. How can I help you today?',
-    timestamp: new Date()
+  type: 'assistant',
+  content: 'Conversation cleared. How can I help you today?',
+  timestamp: new Date()
   }]
   conversationId.value = null
+  totalKbSourcesUsed.value = 0
+  latestSources.value = []
 }
 
 const changeChatMode = (mode) => {
@@ -154,7 +247,7 @@ const formatTime = (timestamp) => {
     <Sidebar class="fixed top-0 left-0 h-screen w-48 z-20" />
 
     <!-- Main Content Area -->
-    <div class="flex-1 flex flex-col ml-56 min-w-0">
+    <div class="flex-1 flex flex-col ml-[250px] min-w-0">
       <!-- Mode Selection Header -->
       <header class="sticky top-0 z-10 px-9 py-3 border-b" :style="{ background: 'var(--bg-primary)', borderColor: 'var(--border-light)' }">
         <div class="flex items-center justify-between">
@@ -188,7 +281,7 @@ const formatTime = (timestamp) => {
       <div class="flex-1 flex overflow-hidden">
         <!-- Central Chat Section -->
         <section class="flex flex-col flex-1 overflow-hidden relative">
-          <div ref="chatMessagesContainer" class="flex-1 overflow-y-auto px-5 py-3 space-y-4 pb-24">
+          <div ref="chatMessagesContainer" class="flex-1 overflow-y-auto px-5 py-3 space-y-4">
             <!-- Message Loop -->
             <div class="space-y-3">
               <ChatBubble
@@ -212,6 +305,9 @@ const formatTime = (timestamp) => {
                 </svg>
               </template>
             </EmptyState>
+
+            <!-- Spacer to prevent bottom bar overlap -->
+            <div class="h-32"></div>
           </div>
 
           <!-- Fixed Bottom Bar for message input -->
@@ -225,7 +321,7 @@ const formatTime = (timestamp) => {
         >
           <!-- Current Mode -->
           <div class="rounded-2xl shadow p-5 border" :style="{ background: 'var(--card-bg)', borderColor: 'var(--card-border)' }">
-            <h3 class="text-base font-semibold mb-4" :style="{ color: 'var(--text-primary)' }">Current Mode</h3>
+            <h3 class="text-base font-semibold mb-4" :style="{ color: 'var(--text-primary)' }">Engine Mode</h3>
             <div class="grid grid-cols-2 gap-3">
               <button
                 v-for="mode in [
@@ -251,6 +347,35 @@ const formatTime = (timestamp) => {
               <span v-else-if="chatMode === 'doubt_clarification'">Step-by-step help to clarify your doubts.</span>
               <span v-else-if="chatMode === 'study_help'">Study strategies, time management, and learning techniques.</span>
               <span v-else>General helpful responses for any question.</span>
+            </p>
+          </div>
+
+          <!-- Direct RAG Toggle -->
+          <div class="rounded-2xl shadow p-5 border" :style="{ background: 'var(--card-bg)', borderColor: 'var(--card-border)' }">
+            <h3 class="text-base font-semibold mb-3" :style="{ color: 'var(--text-primary)' }">Query Strategy</h3>
+            <div class="flex gap-2">
+              <button
+                @click="useDirectRag = false"
+                class="flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 border-2 cursor-pointer min-h-[44px]"
+                :style="!useDirectRag
+                  ? { backgroundColor: 'var(--accent-blue)', borderColor: 'var(--accent-blue)', color: '#ffffff' }
+                  : { backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-default)', color: 'var(--text-secondary)' }"
+              >
+                Agentic
+              </button>
+              <button
+                @click="useDirectRag = true"
+                class="flex-1 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 border-2 cursor-pointer min-h-[44px]"
+                :style="useDirectRag
+                  ? { backgroundColor: 'var(--accent-blue)', borderColor: 'var(--accent-blue)', color: '#ffffff' }
+                  : { backgroundColor: 'var(--card-bg)', borderColor: 'var(--border-default)', color: 'var(--text-secondary)' }"
+              >
+                Direct RAG
+              </button>
+            </div>
+            <p class="text-xs mt-3" :style="{ color: 'var(--text-tertiary)' }">
+              <span v-if="useDirectRag">Fast, direct RAG pipeline without tool calls. Best for factual Q&A.</span>
+              <span v-else>Full agentic mode with function calling, web search, and query lookups.</span>
             </p>
           </div>
 
@@ -280,6 +405,24 @@ const formatTime = (timestamp) => {
             </p>
           </div>
 
+          <!-- Knowledge Sources Used -->
+          <div v-if="totalKbSourcesUsed > 0" class="rounded-2xl shadow p-5 border" :style="{ background: 'var(--card-bg)', borderColor: 'var(--card-border)' }">
+            <h3 class="text-base font-semibold mb-3" :style="{ color: 'var(--text-primary)' }">Sources Referenced</h3>
+            <div class="flex flex-col gap-2">
+              <div
+                v-for="(src, i) in latestSources.slice(0, 5)"
+                :key="i"
+                class="flex items-center gap-2 text-xs px-3 py-2 rounded-lg"
+                :style="{ backgroundColor: 'var(--bg-tertiary)' }"
+              >
+                <svg class="w-3.5 h-3.5 flex-shrink-0" :style="{ color: 'var(--accent-blue)' }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
+                </svg>
+                <span :style="{ color: 'var(--text-primary)' }">{{ src.title || src.source_title || 'Document' }}</span>
+              </div>
+            </div>
+          </div>
+
           <!-- Conversation Info -->
           <div class="rounded-2xl shadow p-5 border" :style="{ background: 'var(--card-bg)', borderColor: 'var(--card-border)' }">
             <h3 class="text-base font-semibold mb-3" :style="{ color: 'var(--text-primary)' }">Conversation</h3>
@@ -287,6 +430,10 @@ const formatTime = (timestamp) => {
               <div class="flex items-center justify-between">
                 <span class="font-medium" :style="{ color: 'var(--text-secondary)' }">Messages:</span>
                 <span class="font-semibold" :style="{ color: 'var(--text-primary)' }">{{ messages.length }}</span>
+              </div>
+              <div class="flex items-center justify-between">
+                <span class="font-medium" :style="{ color: 'var(--text-secondary)' }">KB Sources:</span>
+                <span class="font-semibold" :style="{ color: 'var(--text-primary)' }">{{ totalKbSourcesUsed }}</span>
               </div>
               <div class="flex items-center justify-between">
                 <span class="font-medium" :style="{ color: 'var(--text-secondary)' }">Status:</span>
